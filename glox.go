@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/skusel/glox/error"
+	"github.com/skusel/glox/ast"
+	"github.com/skusel/glox/langerr"
+	"github.com/skusel/glox/parser"
 	"github.com/skusel/glox/scanner"
 )
 
@@ -22,12 +24,12 @@ func main() {
 }
 
 func runFile(path string) {
-	source, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println(err)
+	source, readErr := os.ReadFile(path)
+	if readErr != nil {
+		fmt.Println(readErr)
 		os.Exit(2)
 	} else {
-		var errorHandler error.Handler
+		errorHandler := langerr.Handler{HadError: false}
 		run(string(source), &errorHandler)
 		if errorHandler.HadError {
 			os.Exit(65)
@@ -36,7 +38,7 @@ func runFile(path string) {
 }
 
 func runPrompt() {
-	var errorHandler error.Handler
+	errorHandler := langerr.Handler{HadError: false}
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")
@@ -50,11 +52,16 @@ func runPrompt() {
 	}
 }
 
-func run(source string, errorHandler *error.Handler) {
+func run(source string, errorHandler *langerr.Handler) {
 	scanner := scanner.NewScanner(source, errorHandler)
 	tokens := scanner.ScanTokens()
+	parser := parser.NewParser(tokens, errorHandler)
+	expr := parser.Parse()
 
-	for _, token := range tokens {
-		fmt.Println(token)
+	if errorHandler.HadError {
+		return
 	}
+
+	var printer ast.Printer
+	fmt.Println(printer.Print(expr))
 }

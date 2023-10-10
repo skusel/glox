@@ -1,4 +1,4 @@
-package gloxtoken
+package ast
 
 import "fmt"
 
