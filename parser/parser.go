@@ -163,8 +163,9 @@ func (p *Parser) previous() ast.Token {
 
 func (p *Parser) createError(msg string) error {
 	currentToken := p.peek()
-	p.errorHandler.Report(currentToken.Line, currentToken.Lexeme, msg)
-	return errors.New(msg)
+	err := errors.New(msg)
+	p.errorHandler.Report(currentToken.Line, currentToken.Lexeme, err)
+	return err
 }
 
 func (p *Parser) synchronize() {
