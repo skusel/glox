@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"errors"
 	"strconv"
 	"unicode"
 
@@ -43,7 +44,7 @@ func (s *Scanner) addStringToken() {
 	}
 
 	if s.isAtEnd() {
-		s.errorHandler.Report(s.line, "", "Unterminated string.")
+		s.errorHandler.Report(s.line, "", errors.New("Unterminated string."))
 		return
 	}
 
@@ -69,7 +70,7 @@ func (s *Scanner) addNumberToken() {
 
 	value, err := strconv.ParseFloat(s.source[s.start:s.current], 64)
 	if err != nil {
-		s.errorHandler.Report(s.line, "", "Invalid number.")
+		s.errorHandler.Report(s.line, "", errors.New("Invalid number."))
 	} else {
 		s.addGenericToken(ast.Number, value)
 	}
@@ -192,7 +193,7 @@ func (s *Scanner) scanToken() {
 		} else if unicode.IsLetter(rune(c)) || c == '_' {
 			s.addIdentifierToken()
 		} else {
-			s.errorHandler.Report(s.line, "", "Unexpected character.")
+			s.errorHandler.Report(s.line, "", errors.New("Unexpected character."))
 		}
 	}
 }
