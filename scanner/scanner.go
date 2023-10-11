@@ -4,34 +4,34 @@ import (
 	"strconv"
 	"unicode"
 
-	"github.com/skusel/glox/error"
-	"github.com/skusel/glox/gloxtoken"
+	"github.com/skusel/glox/ast"
+	"github.com/skusel/glox/langerr"
 )
 
 type Scanner struct {
 	source       string
-	tokens       []gloxtoken.Token
+	tokens       []ast.Token
 	start        int
 	current      int
 	line         int
-	errorHandler *error.Handler
+	errorHandler *langerr.Handler
 }
 
-func NewScanner(source string, errorHandler *error.Handler) *Scanner {
+func NewScanner(source string, errorHandler *langerr.Handler) *Scanner {
 	return &Scanner{source: source, start: 0, current: 0, line: 1, errorHandler: errorHandler}
 }
 
-func (s *Scanner) ScanTokens() []gloxtoken.Token {
+func (s *Scanner) ScanTokens() []ast.Token {
 	for !s.isAtEnd() {
 		s.start = s.current
 		s.scanToken()
 	}
-	s.tokens = append(s.tokens, gloxtoken.Token{TokenType: gloxtoken.EndOfFile, Lexeme: "", Literal: nil, Line: s.line})
+	s.tokens = append(s.tokens, ast.Token{TokenType: ast.EndOfFile, Lexeme: "", Literal: nil, Line: s.line})
 	return s.tokens
 }
 
-func (s *Scanner) addToken(token gloxtoken.TokenType) {
-	s.addGenericToken(token, nil)
+func (s *Scanner) addToken(t ast.TokenType) {
+	s.addGenericToken(t, nil)
 }
 
 func (s *Scanner) addStringToken() {
@@ -51,7 +51,7 @@ func (s *Scanner) addStringToken() {
 
 	// Trim the surrouding quotes
 	value := s.source[s.start+1 : s.current-1]
-	s.addGenericToken(gloxtoken.String, value)
+	s.addGenericToken(ast.String, value)
 }
 
 func (s *Scanner) addNumberToken() {
@@ -71,7 +71,7 @@ func (s *Scanner) addNumberToken() {
 	if err != nil {
 		s.errorHandler.Report(s.line, "", "Invalid number.")
 	} else {
-		s.addGenericToken(gloxtoken.Number, value)
+		s.addGenericToken(ast.Number, value)
 	}
 }
 
@@ -82,45 +82,45 @@ func (s *Scanner) addIdentifierToken() {
 
 	text := s.source[s.start:s.current]
 	if text == "and" {
-		s.addGenericToken(gloxtoken.And, text)
+		s.addGenericToken(ast.And, text)
 	} else if text == "class" {
-		s.addGenericToken(gloxtoken.Class, text)
+		s.addGenericToken(ast.Class, text)
 	} else if text == "else" {
-		s.addGenericToken(gloxtoken.Else, text)
+		s.addGenericToken(ast.Else, text)
 	} else if text == "false" {
-		s.addGenericToken(gloxtoken.False, text)
+		s.addGenericToken(ast.False, text)
 	} else if text == "for" {
-		s.addGenericToken(gloxtoken.For, text)
+		s.addGenericToken(ast.For, text)
 	} else if text == "fun" {
-		s.addGenericToken(gloxtoken.Fun, text)
+		s.addGenericToken(ast.Fun, text)
 	} else if text == "if" {
-		s.addGenericToken(gloxtoken.If, text)
+		s.addGenericToken(ast.If, text)
 	} else if text == "nil" {
-		s.addGenericToken(gloxtoken.Nil, text)
+		s.addGenericToken(ast.Nil, text)
 	} else if text == "or" {
-		s.addGenericToken(gloxtoken.Or, text)
+		s.addGenericToken(ast.Or, text)
 	} else if text == "print" {
-		s.addGenericToken(gloxtoken.Print, text)
+		s.addGenericToken(ast.Print, text)
 	} else if text == "return" {
-		s.addGenericToken(gloxtoken.Return, text)
+		s.addGenericToken(ast.Return, text)
 	} else if text == "super" {
-		s.addGenericToken(gloxtoken.Super, text)
+		s.addGenericToken(ast.Super, text)
 	} else if text == "this" {
-		s.addGenericToken(gloxtoken.This, text)
+		s.addGenericToken(ast.This, text)
 	} else if text == "true" {
-		s.addGenericToken(gloxtoken.True, text)
+		s.addGenericToken(ast.True, text)
 	} else if text == "var" {
-		s.addGenericToken(gloxtoken.Var, text)
+		s.addGenericToken(ast.Var, text)
 	} else if text == "while" {
-		s.addGenericToken(gloxtoken.While, text)
+		s.addGenericToken(ast.While, text)
 	} else {
-		s.addGenericToken(gloxtoken.Identifier, text)
+		s.addGenericToken(ast.Identifier, text)
 	}
 }
 
-func (s *Scanner) addGenericToken(token gloxtoken.TokenType, literal any) {
+func (s *Scanner) addGenericToken(t ast.TokenType, literal any) {
 	text := s.source[s.start:s.current]
-	s.tokens = append(s.tokens, gloxtoken.Token{TokenType: token, Lexeme: text, Literal: literal, Line: s.line})
+	s.tokens = append(s.tokens, ast.Token{TokenType: t, Lexeme: text, Literal: literal, Line: s.line})
 }
 
 func (s *Scanner) scanToken() {
@@ -130,48 +130,48 @@ func (s *Scanner) scanToken() {
 	}
 	switch c {
 	case '(':
-		s.addToken(gloxtoken.LeftParen)
+		s.addToken(ast.LeftParen)
 	case ')':
-		s.addToken(gloxtoken.RightParen)
+		s.addToken(ast.RightParen)
 	case '{':
-		s.addToken(gloxtoken.LeftBrace)
+		s.addToken(ast.LeftBrace)
 	case '}':
-		s.addToken(gloxtoken.RightBrace)
+		s.addToken(ast.RightBrace)
 	case ',':
-		s.addToken(gloxtoken.Comma)
+		s.addToken(ast.Comma)
 	case '.':
-		s.addToken(gloxtoken.Dot)
+		s.addToken(ast.Dot)
 	case '-':
-		s.addToken(gloxtoken.Minus)
+		s.addToken(ast.Minus)
 	case '+':
-		s.addToken(gloxtoken.Plus)
+		s.addToken(ast.Plus)
 	case ';':
-		s.addToken(gloxtoken.Semicolon)
+		s.addToken(ast.Semicolon)
 	case '*':
-		s.addToken(gloxtoken.Star)
+		s.addToken(ast.Star)
 	case '!':
 		if s.match('=') {
-			s.addToken(gloxtoken.BangEqual)
+			s.addToken(ast.BangEqual)
 		} else {
-			s.addToken(gloxtoken.Bang)
+			s.addToken(ast.Bang)
 		}
 	case '=':
 		if s.match('=') {
-			s.addToken(gloxtoken.EqualEqual)
+			s.addToken(ast.EqualEqual)
 		} else {
-			s.addToken(gloxtoken.Equal)
+			s.addToken(ast.Equal)
 		}
 	case '<':
 		if s.match('=') {
-			s.addToken(gloxtoken.LessEqual)
+			s.addToken(ast.LessEqual)
 		} else {
-			s.addToken(gloxtoken.Less)
+			s.addToken(ast.Less)
 		}
 	case '>':
 		if s.match('=') {
-			s.addToken(gloxtoken.GreaterEqual)
+			s.addToken(ast.GreaterEqual)
 		} else {
-			s.addToken(gloxtoken.Greater)
+			s.addToken(ast.Greater)
 		}
 	case '/':
 		if s.match('/') {
@@ -180,7 +180,7 @@ func (s *Scanner) scanToken() {
 				s.advance()
 			}
 		} else {
-			s.addToken(gloxtoken.Slash)
+			s.addToken(ast.Slash)
 		}
 	case '\n':
 		s.line++
