@@ -79,7 +79,7 @@ func (interpreter *Interpreter) VisitBinaryExpr(expr ast.BinaryExpr) any {
 		if validStrings {
 			return leftString + rightString
 		}
-		err := errors.New("Operands must be numbers or strings when using the '+' operator.")
+		err := errors.New("Operands must be numbers or strings and be the same type when using the '+' operator.")
 		interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
 	case ast.Slash:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
