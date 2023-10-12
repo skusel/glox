@@ -1,4 +1,4 @@
-package langerr
+package gloxerror
 
 import (
 	"fmt"

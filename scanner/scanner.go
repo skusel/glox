@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/skusel/glox/ast"
-	"github.com/skusel/glox/langerr"
+	"github.com/skusel/glox/gloxerror"
 )
 
 type Scanner struct {
@@ -15,10 +15,10 @@ type Scanner struct {
 	start        int
 	current      int
 	line         int
-	errorHandler *langerr.Handler
+	errorHandler *gloxerror.Handler
 }
 
-func NewScanner(source string, errorHandler *langerr.Handler) *Scanner {
+func NewScanner(source string, errorHandler *gloxerror.Handler) *Scanner {
 	return &Scanner{source: source, start: 0, current: 0, line: 1, errorHandler: errorHandler}
 }
 

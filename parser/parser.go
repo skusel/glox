@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/skusel/glox/ast"
-	"github.com/skusel/glox/langerr"
+	"github.com/skusel/glox/gloxerror"
 )
 
 /******************************************************************************
@@ -24,10 +24,10 @@ import (
 type Parser struct {
 	tokens       []ast.Token
 	current      int
-	errorHandler *langerr.Handler
+	errorHandler *gloxerror.Handler
 }
 
-func NewParser(tokens []ast.Token, errorHandler *langerr.Handler) *Parser {
+func NewParser(tokens []ast.Token, errorHandler *gloxerror.Handler) *Parser {
 	return &Parser{tokens: tokens, current: 0, errorHandler: errorHandler}
 }
 
