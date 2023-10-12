@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/skusel/glox/gloxerror"
 	"github.com/skusel/glox/interpreter"
-	"github.com/skusel/glox/langerr"
 	"github.com/skusel/glox/parser"
 	"github.com/skusel/glox/scanner"
 )
@@ -29,7 +29,7 @@ func runFile(path string) {
 		fmt.Println(readErr)
 		os.Exit(2)
 	} else {
-		errorHandler := langerr.NewHandler()
+		errorHandler := gloxerror.NewHandler()
 		interpreter := interpreter.NewInterpreter(errorHandler)
 		run(string(source), interpreter, errorHandler)
 		if errorHandler.HadError {
@@ -42,7 +42,7 @@ func runFile(path string) {
 }
 
 func runPrompt() {
-	errorHandler := langerr.NewHandler()
+	errorHandler := gloxerror.NewHandler()
 	interpreter := interpreter.NewInterpreter(errorHandler)
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -58,7 +58,7 @@ func runPrompt() {
 	}
 }
 
-func run(source string, interpreter *interpreter.Interpreter, errorHandler *langerr.Handler) {
+func run(source string, interpreter *interpreter.Interpreter, errorHandler *gloxerror.Handler) {
 	scanner := scanner.NewScanner(source, errorHandler)
 	tokens := scanner.ScanTokens()
 	parser := parser.NewParser(tokens, errorHandler)

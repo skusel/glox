@@ -6,14 +6,14 @@ import (
 	"reflect"
 
 	"github.com/skusel/glox/ast"
-	"github.com/skusel/glox/langerr"
+	"github.com/skusel/glox/gloxerror"
 )
 
 type Interpreter struct {
-	errorHandler *langerr.Handler
+	errorHandler *gloxerror.Handler
 }
 
-func NewInterpreter(errorHandler *langerr.Handler) *Interpreter {
+func NewInterpreter(errorHandler *gloxerror.Handler) *Interpreter {
 	return &Interpreter{errorHandler: errorHandler}
 }
 
