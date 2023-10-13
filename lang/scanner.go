@@ -1,37 +1,34 @@
-package scanner
+package lang
 
 import (
 	"errors"
 	"strconv"
 	"unicode"
-
-	"github.com/skusel/glox/ast"
-	"github.com/skusel/glox/gloxerror"
 )
 
 type Scanner struct {
 	source       string
-	tokens       []ast.Token
+	tokens       []Token
 	start        int
 	current      int
 	line         int
-	errorHandler *gloxerror.Handler
+	errorHandler *ErrorHandler
 }
 
-func NewScanner(source string, errorHandler *gloxerror.Handler) *Scanner {
+func NewScanner(source string, errorHandler *ErrorHandler) *Scanner {
 	return &Scanner{source: source, start: 0, current: 0, line: 1, errorHandler: errorHandler}
 }
 
-func (s *Scanner) ScanTokens() []ast.Token {
+func (s *Scanner) ScanTokens() []Token {
 	for !s.isAtEnd() {
 		s.start = s.current
 		s.scanToken()
 	}
-	s.tokens = append(s.tokens, ast.Token{TokenType: ast.EndOfFile, Lexeme: "", Literal: nil, Line: s.line})
+	s.tokens = append(s.tokens, Token{tokenType: tokenTypeEndOfFile, lexeme: "", literal: nil, line: s.line})
 	return s.tokens
 }
 
-func (s *Scanner) addToken(t ast.TokenType) {
+func (s *Scanner) addToken(t TokenType) {
 	s.addGenericToken(t, nil)
 }
 
@@ -44,7 +41,7 @@ func (s *Scanner) addStringToken() {
 	}
 
 	if s.isAtEnd() {
-		s.errorHandler.Report(s.line, "", errors.New("Unterminated string."))
+		s.errorHandler.report(s.line, "", errors.New("Unterminated string."))
 		return
 	}
 
@@ -52,7 +49,7 @@ func (s *Scanner) addStringToken() {
 
 	// Trim the surrouding quotes
 	value := s.source[s.start+1 : s.current-1]
-	s.addGenericToken(ast.String, value)
+	s.addGenericToken(tokenTypeString, value)
 }
 
 func (s *Scanner) addNumberToken() {
@@ -70,9 +67,9 @@ func (s *Scanner) addNumberToken() {
 
 	value, err := strconv.ParseFloat(s.source[s.start:s.current], 64)
 	if err != nil {
-		s.errorHandler.Report(s.line, "", errors.New("Invalid number."))
+		s.errorHandler.report(s.line, "", errors.New("Invalid number."))
 	} else {
-		s.addGenericToken(ast.Number, value)
+		s.addGenericToken(tokenTypeNumber, value)
 	}
 }
 
@@ -83,45 +80,45 @@ func (s *Scanner) addIdentifierToken() {
 
 	text := s.source[s.start:s.current]
 	if text == "and" {
-		s.addGenericToken(ast.And, text)
+		s.addGenericToken(tokenTypeAnd, text)
 	} else if text == "class" {
-		s.addGenericToken(ast.Class, text)
+		s.addGenericToken(tokenTypeClass, text)
 	} else if text == "else" {
-		s.addGenericToken(ast.Else, text)
+		s.addGenericToken(tokenTypeElse, text)
 	} else if text == "false" {
-		s.addGenericToken(ast.False, text)
+		s.addGenericToken(tokenTypeFalse, text)
 	} else if text == "for" {
-		s.addGenericToken(ast.For, text)
+		s.addGenericToken(tokenTypeFor, text)
 	} else if text == "fun" {
-		s.addGenericToken(ast.Fun, text)
+		s.addGenericToken(tokenTypeFun, text)
 	} else if text == "if" {
-		s.addGenericToken(ast.If, text)
+		s.addGenericToken(tokenTypeIf, text)
 	} else if text == "nil" {
-		s.addGenericToken(ast.Nil, text)
+		s.addGenericToken(tokenTypeNil, text)
 	} else if text == "or" {
-		s.addGenericToken(ast.Or, text)
+		s.addGenericToken(tokenTypeOr, text)
 	} else if text == "print" {
-		s.addGenericToken(ast.Print, text)
+		s.addGenericToken(tokenTypePrint, text)
 	} else if text == "return" {
-		s.addGenericToken(ast.Return, text)
+		s.addGenericToken(tokenTypeReturn, text)
 	} else if text == "super" {
-		s.addGenericToken(ast.Super, text)
+		s.addGenericToken(tokenTypeSuper, text)
 	} else if text == "this" {
-		s.addGenericToken(ast.This, text)
+		s.addGenericToken(tokenTypeThis, text)
 	} else if text == "true" {
-		s.addGenericToken(ast.True, text)
+		s.addGenericToken(tokenTypeTrue, text)
 	} else if text == "var" {
-		s.addGenericToken(ast.Var, text)
+		s.addGenericToken(tokenTypeVar, text)
 	} else if text == "while" {
-		s.addGenericToken(ast.While, text)
+		s.addGenericToken(tokenTypeWhile, text)
 	} else {
-		s.addGenericToken(ast.Identifier, text)
+		s.addGenericToken(tokenTypeIdentifier, text)
 	}
 }
 
-func (s *Scanner) addGenericToken(t ast.TokenType, literal any) {
+func (s *Scanner) addGenericToken(tokenType TokenType, literal any) {
 	text := s.source[s.start:s.current]
-	s.tokens = append(s.tokens, ast.Token{TokenType: t, Lexeme: text, Literal: literal, Line: s.line})
+	s.tokens = append(s.tokens, Token{tokenType: tokenType, lexeme: text, literal: literal, line: s.line})
 }
 
 func (s *Scanner) scanToken() {
@@ -131,48 +128,48 @@ func (s *Scanner) scanToken() {
 	}
 	switch c {
 	case '(':
-		s.addToken(ast.LeftParen)
+		s.addToken(tokenTypeLeftParen)
 	case ')':
-		s.addToken(ast.RightParen)
+		s.addToken(tokenTypeRightParen)
 	case '{':
-		s.addToken(ast.LeftBrace)
+		s.addToken(tokenTypeLeftBrace)
 	case '}':
-		s.addToken(ast.RightBrace)
+		s.addToken(tokenTypeRightBrace)
 	case ',':
-		s.addToken(ast.Comma)
+		s.addToken(tokenTypeComma)
 	case '.':
-		s.addToken(ast.Dot)
+		s.addToken(tokenTypeDot)
 	case '-':
-		s.addToken(ast.Minus)
+		s.addToken(tokenTypeMinus)
 	case '+':
-		s.addToken(ast.Plus)
+		s.addToken(tokenTypePlus)
 	case ';':
-		s.addToken(ast.Semicolon)
+		s.addToken(tokenTypeSemicolon)
 	case '*':
-		s.addToken(ast.Star)
+		s.addToken(tokenTypeStar)
 	case '!':
 		if s.match('=') {
-			s.addToken(ast.BangEqual)
+			s.addToken(tokenTypeBangEqual)
 		} else {
-			s.addToken(ast.Bang)
+			s.addToken(tokenTypeBang)
 		}
 	case '=':
 		if s.match('=') {
-			s.addToken(ast.EqualEqual)
+			s.addToken(tokenTypeEqualEqual)
 		} else {
-			s.addToken(ast.Equal)
+			s.addToken(tokenTypeEqual)
 		}
 	case '<':
 		if s.match('=') {
-			s.addToken(ast.LessEqual)
+			s.addToken(tokenTypeLessEqual)
 		} else {
-			s.addToken(ast.Less)
+			s.addToken(tokenTypeLess)
 		}
 	case '>':
 		if s.match('=') {
-			s.addToken(ast.GreaterEqual)
+			s.addToken(tokenTypeGreaterEqual)
 		} else {
-			s.addToken(ast.Greater)
+			s.addToken(tokenTypeGreater)
 		}
 	case '/':
 		if s.match('/') {
@@ -181,7 +178,7 @@ func (s *Scanner) scanToken() {
 				s.advance()
 			}
 		} else {
-			s.addToken(ast.Slash)
+			s.addToken(tokenTypeSlash)
 		}
 	case '\n':
 		s.line++
@@ -193,7 +190,7 @@ func (s *Scanner) scanToken() {
 		} else if unicode.IsLetter(rune(c)) || c == '_' {
 			s.addIdentifierToken()
 		} else {
-			s.errorHandler.Report(s.line, "", errors.New("Unexpected character."))
+			s.errorHandler.report(s.line, "", errors.New("Unexpected character."))
 		}
 	}
 }

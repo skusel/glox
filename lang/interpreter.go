@@ -1,23 +1,20 @@
-package interpreter
+package lang
 
 import (
 	"errors"
 	"fmt"
 	"reflect"
-
-	"github.com/skusel/glox/ast"
-	"github.com/skusel/glox/gloxerror"
 )
 
 type Interpreter struct {
-	errorHandler *gloxerror.Handler
+	errorHandler *ErrorHandler
 }
 
-func NewInterpreter(errorHandler *gloxerror.Handler) *Interpreter {
+func NewInterpreter(errorHandler *ErrorHandler) *Interpreter {
 	return &Interpreter{errorHandler: errorHandler}
 }
 
-func (interperter *Interpreter) Interpret(expr ast.Expr) {
+func (interperter *Interpreter) Interpret(expr Expr) {
 	value := interperter.evaluate(expr)
 	if interperter.errorHandler.HadRuntimeError {
 		return
@@ -26,51 +23,51 @@ func (interperter *Interpreter) Interpret(expr ast.Expr) {
 	}
 }
 
-func (interpreter *Interpreter) evaluate(expr ast.Expr) any {
-	return expr.Accept(interpreter)
+func (interpreter *Interpreter) evaluate(expr Expr) any {
+	return expr.accept(interpreter)
 }
 
-func (interpreter *Interpreter) VisitBinaryExpr(expr ast.BinaryExpr) any {
-	left := interpreter.evaluate(expr.Left)
-	right := interpreter.evaluate(expr.Right)
+func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
+	left := interpreter.evaluate(expr.left)
+	right := interpreter.evaluate(expr.right)
 
-	switch expr.Operator.TokenType {
-	case ast.Greater:
+	switch expr.operator.tokenType {
+	case tokenTypeGreater:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '>' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat > rightFloat
-	case ast.GreaterEqual:
+	case tokenTypeGreaterEqual:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '>=' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat >= rightFloat
-	case ast.Less:
+	case tokenTypeLess:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '<' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat < rightFloat
-	case ast.LessEqual:
+	case tokenTypeLessEqual:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '<=' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat <= rightFloat
-	case ast.Minus:
+	case tokenTypeMinus:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '-' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat - rightFloat
-	case ast.Plus:
+	case tokenTypePlus:
 		validFloats, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if validFloats {
 			return leftFloat + rightFloat
@@ -80,24 +77,24 @@ func (interpreter *Interpreter) VisitBinaryExpr(expr ast.BinaryExpr) any {
 			return leftString + rightString
 		}
 		err := errors.New("Operands must be numbers or strings and be the same type when using the '+' operator.")
-		interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
-	case ast.Slash:
+		interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+	case tokenTypeSlash:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '/' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat / rightFloat
-	case ast.Star:
+	case tokenTypeStar:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '*' operator.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return leftFloat * rightFloat
-	case ast.EqualEqual:
+	case tokenTypeEqualEqual:
 		return reflect.DeepEqual(left, right)
-	case ast.BangEqual:
+	case tokenTypeBangEqual:
 		return !reflect.DeepEqual(left, right)
 	}
 
@@ -105,24 +102,24 @@ func (interpreter *Interpreter) VisitBinaryExpr(expr ast.BinaryExpr) any {
 	return nil
 }
 
-func (interpreter *Interpreter) VisitGroupingExpr(expr ast.GroupingExpr) any {
-	return interpreter.evaluate(expr.Expression)
+func (interpreter *Interpreter) visitGroupingExpr(expr GroupingExpr) any {
+	return interpreter.evaluate(expr.expression)
 }
 
-func (interperter *Interpreter) VisitLiteralExpr(expr ast.LiteralExpr) any {
-	return expr.Value
+func (interperter *Interpreter) visitLiteralExpr(expr LiteralExpr) any {
+	return expr.value
 }
 
-func (interpreter *Interpreter) VisitUnaryExpr(expr ast.UnaryExpr) any {
-	right := interpreter.evaluate(expr.Right)
-	switch expr.Operator.TokenType {
-	case ast.Bang:
+func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
+	right := interpreter.evaluate(expr.right)
+	switch expr.operator.tokenType {
+	case tokenTypeBang:
 		return !isTruthy(right)
-	case ast.Minus:
+	case tokenTypeMinus:
 		rightFloat, rightFloatValid := right.(float64)
 		if !rightFloatValid {
 			err := errors.New("Operand must be a number.")
-			interpreter.errorHandler.ReportRuntime(expr.Operator.Line, err)
+			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
 		}
 		return -1 * rightFloat
 	}
