@@ -6,6 +6,12 @@ import (
 	"unicode"
 )
 
+/******************************************************************************
+ * The scanner takes in source code an transforms it into a list of tokens.
+ * We are also able to catch a few static errors in the scanner. For example,
+ * unterminated strings.
+ *****************************************************************************/
+
 type Scanner struct {
 	source       string
 	tokens       []Token

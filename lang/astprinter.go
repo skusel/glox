@@ -2,10 +2,19 @@ package lang
 
 import "fmt"
 
+/******************************************************************************
+ * Helper struct to display the AST and expression operation precendence in
+ * the earlier stages of development.
+ *****************************************************************************/
+
 type AstPrinter struct{}
 
 func (printer AstPrinter) Print(expr Expr) string {
 	return expr.accept(printer).(string)
+}
+
+func (printer AstPrinter) visitAssignExpr(expr AssignExpr) any {
+	panic("AstPrinter is not able to print assignment expressions at this time.")
 }
 
 func (printer AstPrinter) visitBinaryExpr(expr BinaryExpr) any {
@@ -25,6 +34,10 @@ func (printer AstPrinter) visitLiteralExpr(expr LiteralExpr) any {
 
 func (printer AstPrinter) visitUnaryExpr(expr UnaryExpr) any {
 	return printer.parenthesize(expr.operator.lexeme, expr.right)
+}
+
+func (printer AstPrinter) visitVariableExpr(expr VariableExpr) any {
+	panic("AstPrinter is not able to print variable expressions at this time.")
 }
 
 func (printer AstPrinter) parenthesize(name string, exprs ...Expr) string {

@@ -1,14 +1,29 @@
 package lang
 
+/******************************************************************************
+ * Expresssion definitions. Expressions are nodes of the AST.
+ *****************************************************************************/
+
 type Expr interface {
 	accept(exprVisitor exprVisitor) any
 }
 
 type exprVisitor interface {
+	visitAssignExpr(a AssignExpr) any
 	visitBinaryExpr(b BinaryExpr) any
 	visitGroupingExpr(g GroupingExpr) any
 	visitLiteralExpr(l LiteralExpr) any
 	visitUnaryExpr(u UnaryExpr) any
+	visitVariableExpr(v VariableExpr) any
+}
+
+type AssignExpr struct {
+	name  Token
+	value Expr
+}
+
+func (a AssignExpr) accept(visitor exprVisitor) any {
+	return visitor.visitAssignExpr(a)
 }
 
 type BinaryExpr struct {
@@ -44,4 +59,12 @@ type UnaryExpr struct {
 
 func (u UnaryExpr) accept(visitor exprVisitor) any {
 	return visitor.visitUnaryExpr(u)
+}
+
+type VariableExpr struct {
+	name Token
+}
+
+func (v VariableExpr) accept(visitor exprVisitor) any {
+	return visitor.visitVariableExpr(v)
 }

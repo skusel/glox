@@ -4,6 +4,10 @@ import "fmt"
 
 type TokenType int
 
+/******************************************************************************
+ * A token represents individual lexemes in the Lox source code.
+ *****************************************************************************/
+
 const (
 	// single char tokens
 	tokenTypeLeftParen TokenType = iota

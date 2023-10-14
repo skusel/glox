@@ -59,16 +59,13 @@ func run(source string, interpreter *lang.Interpreter, errorHandler *lang.ErrorH
 	scanner := lang.NewScanner(source, errorHandler)
 	tokens := scanner.ScanTokens()
 	parser := lang.NewParser(tokens, errorHandler)
-	expr := parser.Parse()
+	statements := parser.Parse()
 
 	if errorHandler.HadError {
 		return
 	}
 
-	//var printer lang.AstPrinter
-	//fmt.Println(printer.Print(expr))
-
-	interpreter.Interpret(expr)
+	interpreter.Interpret(statements)
 
 	if errorHandler.HadRuntimeError {
 		return
