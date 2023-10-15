@@ -8,6 +8,12 @@ import (
 	"github.com/skusel/glox/lang"
 )
 
+/******************************************************************************
+ * This is the entry point for the Lox language. Lox is a dynamically typed,
+ * object oriented scripting language with C-like syntax. It was defined by
+ * Robert Nystrom in his book Crafting Interpreters.
+ *****************************************************************************/
+
 func main() {
 	numArgs := len(os.Args[1:])
 	if numArgs > 1 {

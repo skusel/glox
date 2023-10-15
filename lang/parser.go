@@ -21,15 +21,25 @@ import (
  * declaration -> varDecl
  *              | statement ;
  * statement   -> exprStmt
+ *              | forStmt
+ *              | ifStmt
  *              | printStmt
+ *              | whileStmt
  *              | block ;
  * exprStmt    -> expression ";" ;
- * block       -> "{" + declaration* + "}" ;
+ * forStmt     -> "for" "(" ( varDecl | exprStmt | ";" )
+ *                expression? ";"
+ *                expression? ")" statement ;
+ * ifStmt      -> "if" "(" expression ")" statement ( "else" statement )? ;
  * printStmt   -> "print" expression ";" ;
+ * whileStmt   -> "while" "(" expression ")" statement ;
+ * block       -> "{" + declaration* + "}" ;
  * varDecl     -> "var" IDENTIFIER ( "=" expression )? ";" ;
  * expression  -> assignment ;
  * assignment  -> IDENTIFIER "=" assignment
  *              | equality ;
+ * logic_or    -> logic_and ( "or" logic_and )* ;
+ * logic_and   -> equality ( "and" equality )* ;
  * equality    -> comparison ( ("!=" | "==") comparision)* ;
  * comparison  -> term ( ( ">" | ">=" | "<" | "<=") term )* ;
  * term        -> factor ( ( "-" | "+" ) factor )* ;
@@ -104,18 +114,88 @@ func (p *Parser) varDeclaration() Stmt {
 }
 
 func (p *Parser) statement() Stmt {
-	if p.match(tokenTypePrint) {
+	if p.match(tokenTypeFor) {
+		return p.forStatement()
+	} else if p.match(tokenTypeIf) {
+		return p.ifStatement()
+	} else if p.match(tokenTypePrint) {
 		return p.printStatement()
+	} else if p.match(tokenTypeWhile) {
+		return p.whileStatment()
 	} else if p.match(tokenTypeLeftBrace) {
 		return BlockStmt{statements: p.blockStatement()}
+	} else {
+		return p.expressionStatment()
 	}
-	return p.expressionStatment()
 }
 
 func (p *Parser) expressionStatment() Stmt {
 	expr := p.expression()
 	p.consume(tokenTypeSemicolon, "Expect ';' after expression.")
 	return ExprStmt{expr: expr}
+}
+
+func (p *Parser) forStatement() Stmt {
+	// we desugar for statements into while statements
+	p.consume(tokenTypeLeftParen, "Expect '(' after 'for'.")
+	var initializer Stmt
+	if p.match(tokenTypeSemicolon) {
+		initializer = nil
+	} else if p.match(tokenTypeVar) {
+		initializer = p.varDeclaration()
+	} else {
+		initializer = p.expressionStatment()
+	}
+	var condition Expr
+	if !p.check(tokenTypeSemicolon) {
+		condition = p.expression()
+	}
+	p.consume(tokenTypeSemicolon, "Expect ';' after loop condition.")
+	var increment Expr
+	if !p.check(tokenTypeSemicolon) {
+		increment = p.expression()
+	}
+	p.consume(tokenTypeRightParen, "Expect ')' after for clauses.")
+	body := p.statement()
+	if increment != nil {
+		statements := []Stmt{body, ExprStmt{expr: increment}}
+		body = BlockStmt{statements: statements}
+	}
+	if condition == nil {
+		condition = LiteralExpr{value: true}
+	}
+	body = WhileStmt{condition: condition, body: body}
+	if initializer != nil {
+		statements := []Stmt{initializer, body}
+		body = BlockStmt{statements: statements}
+	}
+	return body
+}
+
+func (p *Parser) ifStatement() Stmt {
+	p.consume(tokenTypeLeftParen, "Expect '(' after 'if'.")
+	condition := p.expression()
+	p.consume(tokenTypeRightParen, "Expect ')' after if condition")
+	thenBranch := p.statement()
+	var elseBranch Stmt
+	if p.match(tokenTypeElse) {
+		elseBranch = p.statement()
+	}
+	return IfStmt{condition: condition, thenBranch: thenBranch, elseBranch: elseBranch}
+}
+
+func (p *Parser) printStatement() Stmt {
+	value := p.expression()
+	p.consume(tokenTypeSemicolon, "Expect ';' after value.")
+	return PrintStmt{expr: value}
+}
+
+func (p *Parser) whileStatment() Stmt {
+	p.consume(tokenTypeLeftParen, "Expect '(' after 'while'.")
+	condition := p.expression()
+	p.consume(tokenTypeRightParen, "Expect ')' after while condition")
+	body := p.statement()
+	return WhileStmt{condition: condition, body: body}
 }
 
 func (p *Parser) blockStatement() []Stmt {
@@ -127,18 +207,12 @@ func (p *Parser) blockStatement() []Stmt {
 	return statements
 }
 
-func (p *Parser) printStatement() Stmt {
-	value := p.expression()
-	p.consume(tokenTypeSemicolon, "Expect ';' after value.")
-	return PrintStmt{expr: value}
-}
-
 func (p *Parser) expression() Expr {
 	return p.assignment()
 }
 
 func (p *Parser) assignment() Expr {
-	expr := p.equality()
+	expr := p.or()
 	if p.match(tokenTypeEqual) {
 		equals := p.previous()
 		value := p.assignment()
@@ -149,6 +223,26 @@ func (p *Parser) assignment() Expr {
 			return AssignExpr{name: name, value: value}
 		}
 		p.createError(equals, "Invalid assignment target.", false) // don't need to sync
+	}
+	return expr
+}
+
+func (p *Parser) or() Expr {
+	expr := p.and()
+	for p.match(tokenTypeOr) {
+		operator := p.previous()
+		right := p.and()
+		expr = LogicalExpr{left: expr, operator: operator, right: right}
+	}
+	return expr
+}
+
+func (p *Parser) and() Expr {
+	expr := p.equality()
+	for p.match(tokenTypeAnd) {
+		operator := p.previous()
+		right := p.equality()
+		expr = LogicalExpr{left: expr, operator: operator, right: right}
 	}
 	return expr
 }

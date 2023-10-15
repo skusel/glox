@@ -36,7 +36,7 @@ func (h *ErrorHandler) reportStaticError(line int, where string, err error, sync
 	}
 	staticError := staticError{msg: errorMsg}
 	if synchronize {
-		// panic will cause go to unwind the call stack and we can "catch" the error with recover
+		// panic will unwind the call stack and we can "catch" the error with recover()
 		panic(staticError)
 	} else {
 		// if we are not syncing, immediately report the error to stderr

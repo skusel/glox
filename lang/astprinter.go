@@ -32,6 +32,10 @@ func (printer AstPrinter) visitLiteralExpr(expr LiteralExpr) any {
 	return fmt.Sprint(expr.value)
 }
 
+func (printer AstPrinter) visitLogicalExpr(expr LogicalExpr) any {
+	return printer.parenthesize(expr.operator.lexeme, expr.left, expr.right)
+}
+
 func (printer AstPrinter) visitUnaryExpr(expr UnaryExpr) any {
 	return printer.parenthesize(expr.operator.lexeme, expr.right)
 }
