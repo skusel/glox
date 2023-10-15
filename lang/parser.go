@@ -2,6 +2,7 @@ package lang
 
 import (
 	"errors"
+	"os"
 )
 
 /******************************************************************************
@@ -59,40 +60,46 @@ func (p *Parser) Parse() []Stmt {
 	return statements
 }
 
-func (p *Parser) declaration() Stmt {
-	var stmt Stmt
+func (p *Parser) declaration() (stmt Stmt) {
+	defer func() {
+		/**********************************************************************
+		 * Recover from a static error if one occurred. We "panic" when a
+		 * static error requires synchronization. Handling static errors
+		 * that occur in the parser this way, allows us to report as many
+		 * valid errors as possible before exiting with the static error
+		 * exit code (65).
+		 *********************************************************************/
+		err := recover()
+		if err != nil {
+			staticError, isStaticError := err.(staticError)
+			if isStaticError {
+				os.Stderr.WriteString(staticError.msg)
+				p.synchronize()
+				stmt = nil
+			} else {
+				// this is not a panic thrown by us - pass it on
+				panic(err)
+			}
+		}
+	}()
+
 	if p.match(tokenTypeVar) {
 		stmt = p.varDeclaration()
 	} else {
 		stmt = p.statement()
 	}
-	if p.errorHandler.needToSynchronize {
-		p.synchronize()
-		p.errorHandler.needToSynchronize = false
-		return nil
-	} else {
-		return stmt
-	}
+	return stmt
 }
 
 func (p *Parser) varDeclaration() Stmt {
 	name := p.consume(tokenTypeIdentifier, "Expect variable name.")
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	var initializer Expr
 	if p.match(tokenTypeEqual) {
 		initializer = p.expression()
-		if p.errorHandler.needToSynchronize {
-			return nil
-		}
 	} else {
 		initializer = nil
 	}
 	p.consume(tokenTypeSemicolon, "Expect ';' after variable declaration.")
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	return VarStmt{name: name, initializer: initializer}
 }
 
@@ -107,50 +114,32 @@ func (p *Parser) statement() Stmt {
 
 func (p *Parser) expressionStatment() Stmt {
 	expr := p.expression()
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	p.consume(tokenTypeSemicolon, "Expect ';' after expression.")
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	return ExprStmt{expr: expr}
 }
 
 func (p *Parser) blockStatement() []Stmt {
 	statements := make([]Stmt, 0, 0)
-	for !p.check(tokenTypeRightBrace) && !p.isAtEnd() && !p.errorHandler.needToSynchronize {
+	for !p.check(tokenTypeRightBrace) && !p.isAtEnd() {
 		statements = append(statements, p.declaration())
 	}
 	p.consume(tokenTypeRightBrace, "Expect '}' after block.")
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	return statements
 }
 
 func (p *Parser) printStatement() Stmt {
 	value := p.expression()
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	p.consume(tokenTypeSemicolon, "Expect ';' after value.")
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	return PrintStmt{expr: value}
 }
 
 func (p *Parser) expression() Expr {
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	return p.assignment()
 }
 
 func (p *Parser) assignment() Expr {
 	expr := p.equality()
-	if p.match(tokenTypeEqual) && !p.errorHandler.needToSynchronize {
+	if p.match(tokenTypeEqual) {
 		equals := p.previous()
 		value := p.assignment()
 
@@ -159,14 +148,14 @@ func (p *Parser) assignment() Expr {
 			name := variableExpr.name
 			return AssignExpr{name: name, value: value}
 		}
-		p.errorHandler.report(equals.line, "", errors.New("Invalid assignment target."))
+		p.createError(equals, "Invalid assignment target.", false) // don't need to sync
 	}
 	return expr
 }
 
 func (p *Parser) equality() Expr {
 	expr := p.comparison()
-	for p.match(tokenTypeBangEqual, tokenTypeEqualEqual) && !p.errorHandler.needToSynchronize {
+	for p.match(tokenTypeBangEqual, tokenTypeEqualEqual) {
 		operator := p.previous()
 		right := p.comparison()
 		expr = BinaryExpr{left: expr, operator: operator, right: right}
@@ -176,7 +165,7 @@ func (p *Parser) equality() Expr {
 
 func (p *Parser) comparison() Expr {
 	expr := p.term()
-	for p.match(tokenTypeGreater, tokenTypeGreaterEqual, tokenTypeLess, tokenTypeLessEqual) && !p.errorHandler.needToSynchronize {
+	for p.match(tokenTypeGreater, tokenTypeGreaterEqual, tokenTypeLess, tokenTypeLessEqual) {
 		operator := p.previous()
 		right := p.term()
 		expr = BinaryExpr{left: expr, operator: operator, right: right}
@@ -186,7 +175,7 @@ func (p *Parser) comparison() Expr {
 
 func (p *Parser) term() Expr {
 	expr := p.factor()
-	for p.match(tokenTypeMinus, tokenTypePlus) && !p.errorHandler.needToSynchronize {
+	for p.match(tokenTypeMinus, tokenTypePlus) {
 		operator := p.previous()
 		right := p.factor()
 		expr = BinaryExpr{left: expr, operator: operator, right: right}
@@ -196,7 +185,7 @@ func (p *Parser) term() Expr {
 
 func (p *Parser) factor() Expr {
 	expr := p.unary()
-	for p.match(tokenTypeSlash, tokenTypeStar) && !p.errorHandler.needToSynchronize {
+	for p.match(tokenTypeSlash, tokenTypeStar) {
 		operator := p.previous()
 		right := p.unary()
 		expr = BinaryExpr{left: expr, operator: operator, right: right}
@@ -205,7 +194,7 @@ func (p *Parser) factor() Expr {
 }
 
 func (p *Parser) unary() Expr {
-	if p.match(tokenTypeBang, tokenTypeMinus) && !p.errorHandler.needToSynchronize {
+	if p.match(tokenTypeBang, tokenTypeMinus) {
 		operator := p.previous()
 		right := p.primary()
 		return UnaryExpr{operator: operator, right: right}
@@ -214,9 +203,6 @@ func (p *Parser) unary() Expr {
 }
 
 func (p *Parser) primary() Expr {
-	if p.errorHandler.needToSynchronize {
-		return nil
-	}
 	if p.match(tokenTypeFalse) {
 		return LiteralExpr{value: false}
 	} else if p.match(tokenTypeTrue) {
@@ -232,7 +218,7 @@ func (p *Parser) primary() Expr {
 		p.consume(tokenTypeRightParen, "Expect ')' after expression.")
 		return GroupingExpr{expression: expr}
 	}
-	p.createError("Expect expression.")
+	p.createError(p.peek(), "Expect expression.", true)
 	return nil
 }
 
@@ -250,7 +236,7 @@ func (p *Parser) consume(tokenType TokenType, msg string) Token {
 	if p.check(tokenType) {
 		return p.advance()
 	}
-	p.createError(msg)
+	p.createError(p.peek(), msg, true)
 	return p.peek()
 }
 
@@ -280,9 +266,8 @@ func (p *Parser) previous() Token {
 	return p.tokens[p.current-1]
 }
 
-func (p *Parser) createError(msg string) {
-	currentToken := p.peek()
-	p.errorHandler.report(currentToken.line, currentToken.lexeme, errors.New(msg))
+func (p *Parser) createError(token Token, msg string, synchronize bool) {
+	p.errorHandler.reportStaticError(token.line, token.lexeme, errors.New(msg), synchronize)
 }
 
 func (p *Parser) synchronize() {

@@ -2,6 +2,7 @@ package lang
 
 import (
 	"fmt"
+	"os"
 )
 
 /******************************************************************************
@@ -9,30 +10,43 @@ import (
  *****************************************************************************/
 
 type ErrorHandler struct {
-	needToSynchronize bool // used to report multiple static errors
-	HadError          bool
-	HadRuntimeError   bool
+	HadError        bool
+	HadRuntimeError bool
+}
+
+type staticError struct {
+	msg string
+}
+
+type runtimeError struct {
+	msg string
 }
 
 func NewErrorHandler() *ErrorHandler {
-	return &ErrorHandler{needToSynchronize: false, HadError: false, HadRuntimeError: false}
+	return &ErrorHandler{HadError: false, HadRuntimeError: false}
 }
 
-func (h *ErrorHandler) report(line int, where string, err error) {
-	if h.needToSynchronize {
-		// currently out of sync - don't report another error
-		return
-	}
-	if len(where) > 0 {
-		fmt.Printf("[line %d] Error %s: %s\n", line, where, err)
-	} else {
-		fmt.Printf("[line %d] Error%s: %s\n", line, where, err)
-	}
+func (h *ErrorHandler) reportStaticError(line int, where string, err error, synchronize bool) {
 	h.HadError = true
-	h.needToSynchronize = true
+	var errorMsg string
+	if len(where) > 0 {
+		errorMsg = fmt.Sprintf("[line %d] Error %s: %s\n", line, where, err)
+	} else {
+		errorMsg = fmt.Sprintf("[line %d] Error: %s\n", line, err)
+	}
+	staticError := staticError{msg: errorMsg}
+	if synchronize {
+		// panic will cause go to unwind the call stack and we can "catch" the error with recover
+		panic(staticError)
+	} else {
+		// if we are not syncing, immediately report the error to stderr
+		os.Stderr.WriteString(staticError.msg)
+	}
 }
 
-func (h *ErrorHandler) reportRuntime(line int, err error) {
-	fmt.Printf("[line %d] %s\n", line, err)
+func (h *ErrorHandler) reportRuntimeError(line int, err error) {
 	h.HadRuntimeError = true
+	runtimeError := runtimeError{msg: fmt.Sprintf("[line %d] %s\n", line, err)}
+	// we always want to unwind the call stack and recover for runtime errors
+	panic(runtimeError)
 }

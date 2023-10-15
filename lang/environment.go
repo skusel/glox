@@ -33,7 +33,7 @@ func (env *environment) get(name Token) any {
 	} else if env.enclosing != nil {
 		return env.enclosing.get(name)
 	} else {
-		env.errorHandler.reportRuntime(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
+		env.errorHandler.reportRuntimeError(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
 		return nil
 	}
 }
@@ -45,6 +45,6 @@ func (env *environment) assign(name Token, value any) {
 	} else if env.enclosing != nil {
 		env.enclosing.assign(name, value)
 	} else {
-		env.errorHandler.reportRuntime(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
+		env.errorHandler.reportRuntimeError(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
 	}
 }

@@ -3,6 +3,7 @@ package lang
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 )
 
@@ -22,10 +23,26 @@ func NewInterpreter(errorHandler *ErrorHandler) *Interpreter {
 }
 
 func (interperter *Interpreter) Interpret(statements []Stmt) {
-	for _, statement := range statements {
-		if interperter.errorHandler.HadRuntimeError {
-			break
+	defer func() {
+		err := recover()
+		if err != nil {
+			/******************************************************************
+			 * Gracefully print runtime errors to stderr and return from the
+			 * function. Handling runtime errors in this manner ensures
+			 * that we exit the application with the exit code associated with
+			 * runtime errors (70).
+			 *****************************************************************/
+			runtimeError, isRuntimeError := err.(runtimeError)
+			if isRuntimeError {
+				os.Stderr.WriteString(runtimeError.msg)
+			} else {
+				// this is not a panic thrown by us - pass it on
+				panic(err)
+			}
 		}
+	}()
+
+	for _, statement := range statements {
 		interperter.execute(statement)
 	}
 }
@@ -35,9 +52,6 @@ func (interpreter *Interpreter) executeBlock(statements []Stmt, blockEnv *enviro
 	interpreter.env = blockEnv
 	for _, statement := range statements {
 		interpreter.execute(statement)
-		if interpreter.errorHandler.HadRuntimeError {
-			break
-		}
 	}
 	interpreter.env = parentEnv
 }
@@ -57,17 +71,11 @@ func (interpreter *Interpreter) visitBlockStmt(stmt BlockStmt) any {
 
 func (interpreter *Interpreter) visitExprStmt(stmt ExprStmt) any {
 	interpreter.evaluate(stmt.expr)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if statement expression has runtime error
-	}
 	return nil
 }
 
 func (interpreter *Interpreter) visitPrintStmt(stmt PrintStmt) any {
 	value := interpreter.evaluate(stmt.expr)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if print expression has runtime error
-	}
 	fmt.Println(stringify(value))
 	return nil
 }
@@ -76,9 +84,6 @@ func (interpreter *Interpreter) visitVarStmt(stmt VarStmt) any {
 	var value any // set variable value to nil if not explicitly initialized
 	if stmt.initializer != nil {
 		value = interpreter.evaluate(stmt.initializer)
-		if interpreter.errorHandler.HadRuntimeError {
-			return nil // return immediately if variable init expression has runtime error
-		}
 	}
 	interpreter.env.define(stmt.name.lexeme, value)
 	return nil
@@ -86,57 +91,48 @@ func (interpreter *Interpreter) visitVarStmt(stmt VarStmt) any {
 
 func (interpreter *Interpreter) visitAssignExpr(expr AssignExpr) any {
 	value := interpreter.evaluate(expr.value)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if assignment expression has runtime error
-	}
 	interpreter.env.assign(expr.name, value)
 	return value
 }
 
 func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
 	left := interpreter.evaluate(expr.left)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if left expression has runtime error
-	}
 	right := interpreter.evaluate(expr.right)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if right expression has runtime error
-	}
 
 	switch expr.operator.tokenType {
 	case tokenTypeGreater:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '>' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat > rightFloat
 	case tokenTypeGreaterEqual:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '>=' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat >= rightFloat
 	case tokenTypeLess:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '<' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat < rightFloat
 	case tokenTypeLessEqual:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '<=' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat <= rightFloat
 	case tokenTypeMinus:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '-' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat - rightFloat
 	case tokenTypePlus:
@@ -149,19 +145,19 @@ func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
 			return leftString + rightString
 		}
 		err := errors.New("Operands must be numbers or strings and be the same type when using the '+' operator.")
-		interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+		interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 	case tokenTypeSlash:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '/' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat / rightFloat
 	case tokenTypeStar:
 		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
 		if !valid {
 			err := errors.New("Operands must be numbers when using the '*' operator.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat * rightFloat
 	case tokenTypeEqualEqual:
@@ -176,9 +172,6 @@ func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
 
 func (interpreter *Interpreter) visitGroupingExpr(expr GroupingExpr) any {
 	value := interpreter.evaluate(expr.expression)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if group expression has runtime error
-	}
 	return value
 }
 
@@ -188,9 +181,6 @@ func (interperter *Interpreter) visitLiteralExpr(expr LiteralExpr) any {
 
 func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
 	right := interpreter.evaluate(expr.right)
-	if interpreter.errorHandler.HadRuntimeError {
-		return nil // return immediately if unary expression has runtime error
-	}
 	switch expr.operator.tokenType {
 	case tokenTypeBang:
 		return !isTruthy(right)
@@ -198,7 +188,7 @@ func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
 		rightFloat, rightFloatValid := right.(float64)
 		if !rightFloatValid {
 			err := errors.New("Operand must be a number.")
-			interpreter.errorHandler.reportRuntime(expr.operator.line, err)
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return -1 * rightFloat
 	}
