@@ -47,7 +47,7 @@ func (s *Scanner) addStringToken() {
 	}
 
 	if s.isAtEnd() {
-		s.errorHandler.report(s.line, "", errors.New("Unterminated string."))
+		s.errorHandler.reportStaticError(s.line, "", errors.New("Unterminated string."), false)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (s *Scanner) addNumberToken() {
 
 	value, err := strconv.ParseFloat(s.source[s.start:s.current], 64)
 	if err != nil {
-		s.errorHandler.report(s.line, "", errors.New("Invalid number."))
+		s.errorHandler.reportStaticError(s.line, "", errors.New("Invalid number."), false)
 	} else {
 		s.addGenericToken(tokenTypeNumber, value)
 	}
@@ -196,7 +196,7 @@ func (s *Scanner) scanToken() {
 		} else if unicode.IsLetter(rune(c)) || c == '_' {
 			s.addIdentifierToken()
 		} else {
-			s.errorHandler.report(s.line, "", errors.New("Unexpected character."))
+			s.errorHandler.reportStaticError(s.line, "", errors.New("Unexpected character."), false)
 		}
 	}
 }
