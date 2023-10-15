@@ -74,6 +74,15 @@ func (interpreter *Interpreter) visitExprStmt(stmt ExprStmt) any {
 	return nil
 }
 
+func (interpreter *Interpreter) visitIfStmt(stmt IfStmt) any {
+	if isTruthy(interpreter.evaluate(stmt.condition)) {
+		interpreter.execute(stmt.thenBranch)
+	} else if stmt.elseBranch != nil {
+		interpreter.execute(stmt.elseBranch)
+	}
+	return nil
+}
+
 func (interpreter *Interpreter) visitPrintStmt(stmt PrintStmt) any {
 	value := interpreter.evaluate(stmt.expr)
 	fmt.Println(stringify(value))
@@ -86,6 +95,13 @@ func (interpreter *Interpreter) visitVarStmt(stmt VarStmt) any {
 		value = interpreter.evaluate(stmt.initializer)
 	}
 	interpreter.env.define(stmt.name.lexeme, value)
+	return nil
+}
+
+func (interpreter *Interpreter) visitWhileStmt(stmt WhileStmt) any {
+	for isTruthy(interpreter.evaluate(stmt.condition)) {
+		interpreter.execute(stmt.body)
+	}
 	return nil
 }
 
@@ -179,6 +195,21 @@ func (interperter *Interpreter) visitLiteralExpr(expr LiteralExpr) any {
 	return expr.value
 }
 
+func (interperter *Interpreter) visitLogicalExpr(expr LogicalExpr) any {
+	// check if we can short circuit by evaluating left operand first
+	left := interperter.evaluate(expr.left)
+	if expr.operator.tokenType == tokenTypeOr {
+		if isTruthy(left) {
+			return left
+		}
+	} else {
+		if !isTruthy(left) {
+			return left
+		}
+	}
+	return interperter.evaluate(expr.right)
+}
+
 func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
 	right := interpreter.evaluate(expr.right)
 	switch expr.operator.tokenType {
@@ -218,6 +249,14 @@ func isTruthy(value any) bool {
 	boolVal, isBool := value.(bool)
 	if isBool {
 		return boolVal
+	}
+	strVal, isString := value.(string)
+	if isString {
+		return len(strVal) > 0
+	}
+	number, isNumber := value.(float64)
+	if isNumber {
+		return -1e-9 > number || number > 1e-9
 	}
 	return false
 }

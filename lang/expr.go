@@ -13,6 +13,7 @@ type exprVisitor interface {
 	visitBinaryExpr(b BinaryExpr) any
 	visitGroupingExpr(g GroupingExpr) any
 	visitLiteralExpr(l LiteralExpr) any
+	visitLogicalExpr(l LogicalExpr) any
 	visitUnaryExpr(u UnaryExpr) any
 	visitVariableExpr(v VariableExpr) any
 }
@@ -50,6 +51,16 @@ type LiteralExpr struct {
 
 func (l LiteralExpr) accept(visitor exprVisitor) any {
 	return visitor.visitLiteralExpr(l)
+}
+
+type LogicalExpr struct {
+	left     Expr
+	operator Token
+	right    Expr
+}
+
+func (l LogicalExpr) accept(visitor exprVisitor) any {
+	return visitor.visitLogicalExpr(l)
 }
 
 type UnaryExpr struct {
