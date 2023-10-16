@@ -11,6 +11,7 @@ type Expr interface {
 type exprVisitor interface {
 	visitAssignExpr(a AssignExpr) any
 	visitBinaryExpr(b BinaryExpr) any
+	visitCallExpr(c CallExpr) any
 	visitGroupingExpr(g GroupingExpr) any
 	visitLiteralExpr(l LiteralExpr) any
 	visitLogicalExpr(l LogicalExpr) any
@@ -35,6 +36,16 @@ type BinaryExpr struct {
 
 func (b BinaryExpr) accept(visitor exprVisitor) any {
 	return visitor.visitBinaryExpr(b)
+}
+
+type CallExpr struct {
+	callee Expr
+	paren  Token
+	args   []Expr
+}
+
+func (c CallExpr) accept(visitor exprVisitor) any {
+	return visitor.visitCallExpr(c)
 }
 
 type GroupingExpr struct {

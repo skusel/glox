@@ -14,23 +14,25 @@ import (
  *****************************************************************************/
 
 type Interpreter struct {
+	globals      *environment
 	env          *environment
 	errorHandler *ErrorHandler
 }
 
 func NewInterpreter(errorHandler *ErrorHandler) *Interpreter {
-	return &Interpreter{env: newEnvironment(errorHandler), errorHandler: errorHandler}
+	globals := newEnvironment(errorHandler)
+	return &Interpreter{globals: globals, env: globals, errorHandler: errorHandler}
 }
 
-func (interperter *Interpreter) Interpret(statements []Stmt) {
+func (interpreter *Interpreter) Interpret(statements []Stmt) {
 	defer func() {
 		err := recover()
 		if err != nil {
 			/******************************************************************
 			 * Gracefully print runtime errors to stderr and return from the
-			 * function. Handling runtime errors in this manner ensures
-			 * that we exit the application with the exit code associated with
-			 * runtime errors (70).
+			 * function. Handling runtime errors in this deferred function
+			 * allows us to exit the application with the runtime error exit
+			 * code (70).
 			 *****************************************************************/
 			runtimeError, isRuntimeError := err.(runtimeError)
 			if isRuntimeError {
@@ -42,18 +44,30 @@ func (interperter *Interpreter) Interpret(statements []Stmt) {
 		}
 	}()
 
+	interpreter.defineNativeFunctions()
 	for _, statement := range statements {
-		interperter.execute(statement)
+		interpreter.execute(statement)
 	}
 }
 
+func (interperter *Interpreter) defineNativeFunctions() {
+	interperter.globals.define("clock", clock{})
+}
+
 func (interpreter *Interpreter) executeBlock(statements []Stmt, blockEnv *environment) {
-	parentEnv := interpreter.env
+	previousEnv := interpreter.env
+	defer func() {
+		/**********************************************************************
+		 * Always set the environment back to the previous environment before
+		 * we exit the function. This is needed so it gets hit even if there
+		 * is a return statement or a runtime error occurs in the block.
+		 *********************************************************************/
+		interpreter.env = previousEnv
+	}()
 	interpreter.env = blockEnv
 	for _, statement := range statements {
 		interpreter.execute(statement)
 	}
-	interpreter.env = parentEnv
 }
 
 func (interpreter *Interpreter) execute(stmt Stmt) any {
@@ -74,6 +88,12 @@ func (interpreter *Interpreter) visitExprStmt(stmt ExprStmt) any {
 	return nil
 }
 
+func (interpreter *Interpreter) visitFunctionStmt(stmt FunctionStmt) any {
+	function := function{declaration: stmt, closure: interpreter.env}
+	interpreter.env.define(stmt.name.lexeme, function)
+	return nil
+}
+
 func (interpreter *Interpreter) visitIfStmt(stmt IfStmt) any {
 	if isTruthy(interpreter.evaluate(stmt.condition)) {
 		interpreter.execute(stmt.thenBranch)
@@ -87,6 +107,16 @@ func (interpreter *Interpreter) visitPrintStmt(stmt PrintStmt) any {
 	value := interpreter.evaluate(stmt.expr)
 	fmt.Println(stringify(value))
 	return nil
+}
+
+func (interpreter *Interpreter) visitReturnStmt(stmt ReturnStmt) any {
+	var value any
+	if stmt.value != nil {
+		value = interpreter.evaluate(stmt.value)
+	}
+
+	// this is a hack to unwind the call stack
+	panic(returnContent{value: value})
 }
 
 func (interpreter *Interpreter) visitVarStmt(stmt VarStmt) any {
@@ -184,6 +214,29 @@ func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
 
 	// unreachable
 	return nil
+}
+
+func (interpreter *Interpreter) visitCallExpr(expr CallExpr) any {
+	callee := interpreter.evaluate(expr.callee)
+
+	args := make([]any, 0, 0)
+	for _, arg := range expr.args {
+		args = append(args, interpreter.evaluate(arg))
+	}
+
+	function, isFunction := callee.(callable)
+	if isFunction {
+		if len(args) != function.arity() {
+			err := errors.New(fmt.Sprintf("Expected %d arguments but got %d.", function.arity(), len(args)))
+			interpreter.errorHandler.reportRuntimeError(expr.paren.line, err)
+			return nil
+		}
+		return function.call(interpreter, args)
+	} else {
+		err := errors.New("Can only call functions and classes.")
+		interpreter.errorHandler.reportRuntimeError(expr.paren.line, err)
+		return nil
+	}
 }
 
 func (interpreter *Interpreter) visitGroupingExpr(expr GroupingExpr) any {

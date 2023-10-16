@@ -18,34 +18,40 @@ import (
  * Backus-Naur Form (BNF) of Parser Grammar
  * ========================================
  * program     -> statement* EOF ;
- * declaration -> varDecl
+ * declaration -> funDecl
+ *              | varDecl
  *              | statement ;
  * statement   -> exprStmt
  *              | forStmt
  *              | ifStmt
  *              | printStmt
+ *              | returnStmt
  *              | whileStmt
  *              | block ;
  * exprStmt    -> expression ";" ;
  * forStmt     -> "for" "(" ( varDecl | exprStmt | ";" )
  *                expression? ";"
  *                expression? ")" statement ;
+ * funDecl     -> "fun" function ;
+ * function    -> IDENTIFIER "(" parameters? ")" block ;
+ * parameters  -> IDENTIFIER ( "," IDENTIFIER )* ;
  * ifStmt      -> "if" "(" expression ")" statement ( "else" statement )? ;
  * printStmt   -> "print" expression ";" ;
+ * returnStmt  -> "return" expression? ";" ;
  * whileStmt   -> "while" "(" expression ")" statement ;
  * block       -> "{" + declaration* + "}" ;
  * varDecl     -> "var" IDENTIFIER ( "=" expression )? ";" ;
  * expression  -> assignment ;
- * assignment  -> IDENTIFIER "=" assignment
- *              | equality ;
+ * assignment  -> IDENTIFIER "=" assignment | equality ;
  * logic_or    -> logic_and ( "or" logic_and )* ;
  * logic_and   -> equality ( "and" equality )* ;
  * equality    -> comparison ( ("!=" | "==") comparision)* ;
  * comparison  -> term ( ( ">" | ">=" | "<" | "<=") term )* ;
  * term        -> factor ( ( "-" | "+" ) factor )* ;
  * factor      -> unary ( ( "/" | "*") unary )* ;
- * unary       -> ( "!" | "-" ) unary
- *              | primary ;
+ * unary       -> ( "!" | "-" ) unary | call ;
+ * call        -> primary ( "(" arguments? ")" )* ;
+ * arguments   -> expression ( "," expression )* ;
  * primary     -> "true" | "false" | "nil"
  *              | NUMBER | STRING
  *			    | "(" expression ")"
@@ -73,11 +79,11 @@ func (p *Parser) Parse() []Stmt {
 func (p *Parser) declaration() (stmt Stmt) {
 	defer func() {
 		/**********************************************************************
-		 * Recover from a static error if one occurred. We "panic" when a
-		 * static error requires synchronization. Handling static errors
-		 * that occur in the parser this way, allows us to report as many
-		 * valid errors as possible before exiting with the static error
-		 * exit code (65).
+		 * Recover from a static error if one occurred. ErrorHandler "panics"
+		 * when a static error requires synchronization. This causes the call
+		 * stack to unwind and enter this defered function so that the parser
+		 * can synchronize and continue reporting more errors before exiting
+		 * with the static error exit code (65).
 		 *********************************************************************/
 		err := recover()
 		if err != nil {
@@ -93,12 +99,34 @@ func (p *Parser) declaration() (stmt Stmt) {
 		}
 	}()
 
-	if p.match(tokenTypeVar) {
+	if p.match(tokenTypeFun) {
+		stmt = p.function("function")
+	} else if p.match(tokenTypeVar) {
 		stmt = p.varDeclaration()
 	} else {
 		stmt = p.statement()
 	}
 	return stmt
+}
+
+func (p *Parser) function(kind string) Stmt {
+	name := p.consume(tokenTypeIdentifier, "Expect "+kind+" name.")
+	p.consume(tokenTypeLeftParen, "Expect '(' after "+kind+" name.")
+	params := make([]Token, 0, 0)
+	if !p.check(tokenTypeRightParen) {
+		params = append(params, p.consume(tokenTypeIdentifier, "Expect parameter name."))
+		for p.match(tokenTypeComma) {
+			if len(params) >= 255 {
+				p.createError(p.peek(), "Can't have more than 255 parameters.", false) // don't need to sync
+			}
+			params = append(params, p.consume(tokenTypeIdentifier, "Expect parameter name."))
+		}
+	}
+	p.consume(tokenTypeRightParen, "Expect ')' after parameters.")
+	// blockStatement expects '{' has already been matched
+	p.consume(tokenTypeLeftBrace, "Expect '{' before "+kind+" body.")
+	body := p.blockStatement()
+	return FunctionStmt{name: name, params: params, body: body}
 }
 
 func (p *Parser) varDeclaration() Stmt {
@@ -120,6 +148,8 @@ func (p *Parser) statement() Stmt {
 		return p.ifStatement()
 	} else if p.match(tokenTypePrint) {
 		return p.printStatement()
+	} else if p.match(tokenTypeReturn) {
+		return p.returnStatement()
 	} else if p.match(tokenTypeWhile) {
 		return p.whileStatment()
 	} else if p.match(tokenTypeLeftBrace) {
@@ -136,7 +166,7 @@ func (p *Parser) expressionStatment() Stmt {
 }
 
 func (p *Parser) forStatement() Stmt {
-	// we desugar for statements into while statements
+	// desugar for statements into while statements
 	p.consume(tokenTypeLeftParen, "Expect '(' after 'for'.")
 	var initializer Stmt
 	if p.match(tokenTypeSemicolon) {
@@ -188,6 +218,16 @@ func (p *Parser) printStatement() Stmt {
 	value := p.expression()
 	p.consume(tokenTypeSemicolon, "Expect ';' after value.")
 	return PrintStmt{expr: value}
+}
+
+func (p *Parser) returnStatement() Stmt {
+	keyword := p.previous()
+	var value Expr
+	if !p.check(tokenTypeSemicolon) {
+		value = p.expression()
+	}
+	p.consume(tokenTypeSemicolon, "Expect ';' after return value.")
+	return ReturnStmt{keyword: keyword, value: value}
 }
 
 func (p *Parser) whileStatment() Stmt {
@@ -293,7 +333,36 @@ func (p *Parser) unary() Expr {
 		right := p.primary()
 		return UnaryExpr{operator: operator, right: right}
 	}
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() Expr {
+	expr := p.primary()
+
+	for {
+		if p.match(tokenTypeLeftParen) {
+			expr = p.finishCall(expr)
+		} else {
+			break
+		}
+	}
+
+	return expr
+}
+
+func (p *Parser) finishCall(callee Expr) Expr {
+	args := make([]Expr, 0, 0)
+	if !p.check(tokenTypeRightParen) {
+		args = append(args, p.expression())
+		for p.match(tokenTypeComma) {
+			if len(args) >= 255 {
+				p.createError(p.peek(), "Can't have more than 255 arguments.", false) // don't need to sync
+			}
+			args = append(args, p.expression())
+		}
+	}
+	paren := p.consume(tokenTypeRightParen, "Expect ')' after arguments.")
+	return CallExpr{callee: callee, paren: paren, args: args}
 }
 
 func (p *Parser) primary() Expr {
@@ -365,6 +434,8 @@ func (p *Parser) createError(token Token, msg string, synchronize bool) {
 }
 
 func (p *Parser) synchronize() {
+	p.advance()
+
 	for !p.isAtEnd() {
 		if p.previous().tokenType == tokenTypeSemicolon {
 			return
