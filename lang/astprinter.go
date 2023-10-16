@@ -21,6 +21,10 @@ func (printer AstPrinter) visitBinaryExpr(expr BinaryExpr) any {
 	return printer.parenthesize(expr.operator.lexeme, expr.left, expr.right)
 }
 
+func (printer AstPrinter) visitCallExpr(expr CallExpr) any {
+	panic("AstPrinter is not able to print call expressions at this time.")
+}
+
 func (printer AstPrinter) visitGroupingExpr(expr GroupingExpr) any {
 	return printer.parenthesize("group", expr.expression)
 }
