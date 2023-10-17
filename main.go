@@ -71,6 +71,13 @@ func run(source string, interpreter *lang.Interpreter, errorHandler *lang.ErrorH
 		return
 	}
 
+	resolver := lang.NewResolver(interpreter)
+	resolver.ResolveStatements(statements)
+
+	if errorHandler.HadError {
+		return
+	}
+
 	interpreter.Interpret(statements)
 
 	if errorHandler.HadRuntimeError {

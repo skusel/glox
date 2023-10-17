@@ -26,6 +26,24 @@ func (env *environment) define(name string, value any) {
 	env.values[name] = value
 }
 
+func (env *environment) ancestor(distance int) *environment {
+	ancestorEnv := env
+	for i := 0; i < distance; i++ {
+		ancestorEnv = ancestorEnv.enclosing
+	}
+	return ancestorEnv
+}
+
+func (env *environment) getAt(distance int, name Token) any {
+	value, found := env.ancestor(distance).values[name.lexeme]
+	if found {
+		return value
+	} else {
+		env.errorHandler.reportRuntimeError(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
+		return nil
+	}
+}
+
 func (env *environment) get(name Token) any {
 	value, found := env.values[name.lexeme]
 	if found {
@@ -36,6 +54,10 @@ func (env *environment) get(name Token) any {
 		env.errorHandler.reportRuntimeError(name.line, errors.New("Undefined variable '"+name.lexeme+"'."))
 		return nil
 	}
+}
+
+func (env *environment) assignAt(distance int, name Token, value any) {
+	env.ancestor(distance).values[name.lexeme] = value
 }
 
 func (env *environment) assign(name Token, value any) {

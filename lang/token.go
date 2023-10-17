@@ -2,11 +2,11 @@ package lang
 
 import "fmt"
 
-type TokenType int
-
 /******************************************************************************
  * A token represents individual lexemes in the Lox source code.
  *****************************************************************************/
+
+type TokenType int
 
 const (
 	// single char tokens
