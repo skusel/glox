@@ -16,12 +16,14 @@ import (
 type Interpreter struct {
 	globals      *environment
 	env          *environment
+	locals       map[int]int
 	errorHandler *ErrorHandler
 }
 
 func NewInterpreter(errorHandler *ErrorHandler) *Interpreter {
 	globals := newEnvironment(errorHandler)
-	return &Interpreter{globals: globals, env: globals, errorHandler: errorHandler}
+	return &Interpreter{globals: globals, env: globals, locals: make(map[int]int),
+		errorHandler: errorHandler}
 }
 
 func (interpreter *Interpreter) Interpret(statements []Stmt) {
@@ -47,6 +49,20 @@ func (interpreter *Interpreter) Interpret(statements []Stmt) {
 	interpreter.defineNativeFunctions()
 	for _, statement := range statements {
 		interpreter.execute(statement)
+	}
+}
+
+func (interpreter *Interpreter) resolve(expr Expr, depth int) {
+	interpreter.locals[expr.getId()] = depth
+}
+
+func (interpreter *Interpreter) lookUpVariable(name Token, expr VariableExpr) any {
+	distance, hasDistance := interpreter.locals[expr.getId()]
+	// resolved only local variables so if there is not distance, check the global map
+	if hasDistance {
+		return interpreter.env.getAt(distance, name)
+	} else {
+		return interpreter.globals.get(name)
 	}
 }
 
@@ -137,7 +153,12 @@ func (interpreter *Interpreter) visitWhileStmt(stmt WhileStmt) any {
 
 func (interpreter *Interpreter) visitAssignExpr(expr AssignExpr) any {
 	value := interpreter.evaluate(expr.value)
-	interpreter.env.assign(expr.name, value)
+	distance, hasDistance := interpreter.locals[expr.getId()]
+	if hasDistance {
+		interpreter.env.assignAt(distance, expr.name, value)
+	} else {
+		interpreter.env.assign(expr.name, value)
+	}
 	return value
 }
 
@@ -280,7 +301,7 @@ func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
 }
 
 func (interpreter *Interpreter) visitVariableExpr(expr VariableExpr) any {
-	return interpreter.env.get(expr.name)
+	return interpreter.lookUpVariable(expr.name, expr)
 }
 
 func areValuesValidFloats(left, right any) (bool, float64, float64) {

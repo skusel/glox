@@ -61,6 +61,7 @@ import (
 type Parser struct {
 	tokens       []Token
 	current      int
+	nextExprId   int
 	errorHandler *ErrorHandler
 }
 
@@ -192,7 +193,7 @@ func (p *Parser) forStatement() Stmt {
 		body = BlockStmt{statements: statements}
 	}
 	if condition == nil {
-		condition = LiteralExpr{value: true}
+		condition = LiteralExpr{id: p.getNextExprId(), value: true}
 	}
 	body = WhileStmt{condition: condition, body: body}
 	if initializer != nil {
@@ -260,7 +261,7 @@ func (p *Parser) assignment() Expr {
 		variableExpr, isVariableExpr := expr.(VariableExpr)
 		if isVariableExpr {
 			name := variableExpr.name
-			return AssignExpr{name: name, value: value}
+			return AssignExpr{id: p.getNextExprId(), name: name, value: value}
 		}
 		p.createError(equals, "Invalid assignment target.", false) // don't need to sync
 	}
@@ -272,7 +273,7 @@ func (p *Parser) or() Expr {
 	for p.match(tokenTypeOr) {
 		operator := p.previous()
 		right := p.and()
-		expr = LogicalExpr{left: expr, operator: operator, right: right}
+		expr = LogicalExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -282,7 +283,7 @@ func (p *Parser) and() Expr {
 	for p.match(tokenTypeAnd) {
 		operator := p.previous()
 		right := p.equality()
-		expr = LogicalExpr{left: expr, operator: operator, right: right}
+		expr = LogicalExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -292,7 +293,7 @@ func (p *Parser) equality() Expr {
 	for p.match(tokenTypeBangEqual, tokenTypeEqualEqual) {
 		operator := p.previous()
 		right := p.comparison()
-		expr = BinaryExpr{left: expr, operator: operator, right: right}
+		expr = BinaryExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -302,7 +303,7 @@ func (p *Parser) comparison() Expr {
 	for p.match(tokenTypeGreater, tokenTypeGreaterEqual, tokenTypeLess, tokenTypeLessEqual) {
 		operator := p.previous()
 		right := p.term()
-		expr = BinaryExpr{left: expr, operator: operator, right: right}
+		expr = BinaryExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -312,7 +313,7 @@ func (p *Parser) term() Expr {
 	for p.match(tokenTypeMinus, tokenTypePlus) {
 		operator := p.previous()
 		right := p.factor()
-		expr = BinaryExpr{left: expr, operator: operator, right: right}
+		expr = BinaryExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -322,7 +323,7 @@ func (p *Parser) factor() Expr {
 	for p.match(tokenTypeSlash, tokenTypeStar) {
 		operator := p.previous()
 		right := p.unary()
-		expr = BinaryExpr{left: expr, operator: operator, right: right}
+		expr = BinaryExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}
 	}
 	return expr
 }
@@ -331,7 +332,7 @@ func (p *Parser) unary() Expr {
 	if p.match(tokenTypeBang, tokenTypeMinus) {
 		operator := p.previous()
 		right := p.primary()
-		return UnaryExpr{operator: operator, right: right}
+		return UnaryExpr{id: p.getNextExprId(), operator: operator, right: right}
 	}
 	return p.call()
 }
@@ -362,24 +363,24 @@ func (p *Parser) finishCall(callee Expr) Expr {
 		}
 	}
 	paren := p.consume(tokenTypeRightParen, "Expect ')' after arguments.")
-	return CallExpr{callee: callee, paren: paren, args: args}
+	return CallExpr{id: p.getNextExprId(), callee: callee, paren: paren, args: args}
 }
 
 func (p *Parser) primary() Expr {
 	if p.match(tokenTypeFalse) {
-		return LiteralExpr{value: false}
+		return LiteralExpr{id: p.getNextExprId(), value: false}
 	} else if p.match(tokenTypeTrue) {
-		return LiteralExpr{value: true}
+		return LiteralExpr{id: p.getNextExprId(), value: true}
 	} else if p.match(tokenTypeNil) {
-		return LiteralExpr{value: nil}
+		return LiteralExpr{id: p.getNextExprId(), value: nil}
 	} else if p.match(tokenTypeNumber, tokenTypeString) {
-		return LiteralExpr{value: p.previous().literal}
+		return LiteralExpr{id: p.getNextExprId(), value: p.previous().literal}
 	} else if p.match(tokenTypeIdentifier) {
-		return VariableExpr{name: p.previous()}
+		return VariableExpr{id: p.getNextExprId(), name: p.previous()}
 	} else if p.match(tokenTypeLeftParen) {
 		expr := p.expression()
 		p.consume(tokenTypeRightParen, "Expect ')' after expression.")
-		return GroupingExpr{expression: expr}
+		return GroupingExpr{id: p.getNextExprId(), expression: expr}
 	}
 	p.createError(p.peek(), "Expect expression.", true)
 	return nil
@@ -427,6 +428,11 @@ func (p *Parser) peek() Token {
 
 func (p *Parser) previous() Token {
 	return p.tokens[p.current-1]
+}
+
+func (p *Parser) getNextExprId() int {
+	p.nextExprId++
+	return p.nextExprId
 }
 
 func (p *Parser) createError(token Token, msg string, synchronize bool) {
