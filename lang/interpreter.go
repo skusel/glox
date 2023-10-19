@@ -56,7 +56,7 @@ func (interpreter *Interpreter) resolve(expr Expr, depth int) {
 	interpreter.locals[expr.getId()] = depth
 }
 
-func (interpreter *Interpreter) lookUpVariable(name Token, expr VariableExpr) any {
+func (interpreter *Interpreter) lookUpVariable(name Token, expr Expr) any {
 	distance, hasDistance := interpreter.locals[expr.getId()]
 	// resolved only local variables so if there is not distance, check the global map
 	if hasDistance {
@@ -99,13 +99,25 @@ func (interpreter *Interpreter) visitBlockStmt(stmt BlockStmt) any {
 	return nil
 }
 
+func (interpreter *Interpreter) visitClassStmt(stmt ClassStmt) any {
+	interpreter.env.define(stmt.name.lexeme, nil)
+	methods := make(map[string]function)
+	for _, method := range stmt.methods {
+		methods[method.name.lexeme] = function{declaration: method, closure: interpreter.env,
+			isInitializer: method.name.lexeme == "init"}
+	}
+	class := class{name: stmt.name.lexeme, methods: methods, errorHandler: interpreter.errorHandler}
+	interpreter.env.assign(stmt.name, class)
+	return nil
+}
+
 func (interpreter *Interpreter) visitExprStmt(stmt ExprStmt) any {
 	interpreter.evaluate(stmt.expr)
 	return nil
 }
 
 func (interpreter *Interpreter) visitFunctionStmt(stmt FunctionStmt) any {
-	function := function{declaration: stmt, closure: interpreter.env}
+	function := function{declaration: stmt, closure: interpreter.env, isInitializer: false}
 	interpreter.env.define(stmt.name.lexeme, function)
 	return nil
 }
@@ -245,19 +257,29 @@ func (interpreter *Interpreter) visitCallExpr(expr CallExpr) any {
 		args = append(args, interpreter.evaluate(arg))
 	}
 
-	function, isFunction := callee.(callable)
-	if isFunction {
-		if len(args) != function.arity() {
-			err := errors.New(fmt.Sprintf("Expected %d arguments but got %d.", function.arity(), len(args)))
+	callable, isCallable := callee.(callable)
+	if isCallable {
+		if len(args) != callable.arity() {
+			err := errors.New(fmt.Sprintf("Expected %d arguments but got %d.", callable.arity(), len(args)))
 			interpreter.errorHandler.reportRuntimeError(expr.paren.line, err)
 			return nil
 		}
-		return function.call(interpreter, args)
+		return callable.call(interpreter, args)
 	} else {
 		err := errors.New("Can only call functions and classes.")
 		interpreter.errorHandler.reportRuntimeError(expr.paren.line, err)
 		return nil
 	}
+}
+
+func (interpreter *Interpreter) visitGetExpr(expr GetExpr) any {
+	object, isInstance := interpreter.evaluate(expr.object).(instance)
+	if isInstance {
+		return object.get(expr.name)
+	}
+	err := errors.New("Only instances have properties.")
+	interpreter.errorHandler.reportRuntimeError(expr.name.line, err)
+	return nil
 }
 
 func (interpreter *Interpreter) visitGroupingExpr(expr GroupingExpr) any {
@@ -282,6 +304,22 @@ func (interperter *Interpreter) visitLogicalExpr(expr LogicalExpr) any {
 		}
 	}
 	return interperter.evaluate(expr.right)
+}
+
+func (interpreter *Interpreter) visitSetExpr(expr SetExpr) any {
+	object, isInstance := interpreter.evaluate(expr.object).(instance)
+	if !isInstance {
+		err := errors.New("Only instances have fields.")
+		interpreter.errorHandler.reportRuntimeError(expr.name.line, err)
+		return nil
+	}
+	value := interpreter.evaluate(expr.value)
+	object.set(expr.name, value)
+	return value
+}
+
+func (interpreter *Interpreter) visitThisExpr(expr ThisExpr) any {
+	return interpreter.lookUpVariable(expr.keyword, expr)
 }
 
 func (interpreter *Interpreter) visitUnaryExpr(expr UnaryExpr) any {
@@ -338,6 +376,14 @@ func isTruthy(value any) bool {
 func stringify(value any) string {
 	if value == nil {
 		return "nil"
+	}
+	callable, isCallable := value.(callable)
+	if isCallable {
+		return callable.toString()
+	}
+	instance, isInstance := value.(instance)
+	if isInstance {
+		return instance.toString()
 	}
 	return fmt.Sprint(value)
 }

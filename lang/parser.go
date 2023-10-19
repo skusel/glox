@@ -18,7 +18,8 @@ import (
  * Backus-Naur Form (BNF) of Parser Grammar
  * ========================================
  * program     -> statement* EOF ;
- * declaration -> funDecl
+ * declaration -> classDecl
+ *              | funDecl
  *              | varDecl
  *              | statement ;
  * statement   -> exprStmt
@@ -32,6 +33,7 @@ import (
  * forStmt     -> "for" "(" ( varDecl | exprStmt | ";" )
  *                expression? ";"
  *                expression? ")" statement ;
+ * classDecl   -> "class" IDENTIFIER "{" function* "}" ;
  * funDecl     -> "fun" function ;
  * function    -> IDENTIFIER "(" parameters? ")" block ;
  * parameters  -> IDENTIFIER ( "," IDENTIFIER )* ;
@@ -42,7 +44,7 @@ import (
  * block       -> "{" + declaration* + "}" ;
  * varDecl     -> "var" IDENTIFIER ( "=" expression )? ";" ;
  * expression  -> assignment ;
- * assignment  -> IDENTIFIER "=" assignment | equality ;
+ * assignment  -> ( call "." )? IDENTIFIER "=" assignment | logic_or ;
  * logic_or    -> logic_and ( "or" logic_and )* ;
  * logic_and   -> equality ( "and" equality )* ;
  * equality    -> comparison ( ("!=" | "==") comparision)* ;
@@ -50,7 +52,7 @@ import (
  * term        -> factor ( ( "-" | "+" ) factor )* ;
  * factor      -> unary ( ( "/" | "*") unary )* ;
  * unary       -> ( "!" | "-" ) unary | call ;
- * call        -> primary ( "(" arguments? ")" )* ;
+ * call        -> primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
  * arguments   -> expression ( "," expression )* ;
  * primary     -> "true" | "false" | "nil"
  *              | NUMBER | STRING
@@ -100,7 +102,9 @@ func (p *Parser) declaration() (stmt Stmt) {
 		}
 	}()
 
-	if p.match(tokenTypeFun) {
+	if p.match(tokenTypeClass) {
+		stmt = p.classDeclaration()
+	} else if p.match(tokenTypeFun) {
 		stmt = p.function("function")
 	} else if p.match(tokenTypeVar) {
 		stmt = p.varDeclaration()
@@ -110,7 +114,18 @@ func (p *Parser) declaration() (stmt Stmt) {
 	return stmt
 }
 
-func (p *Parser) function(kind string) Stmt {
+func (p *Parser) classDeclaration() Stmt {
+	name := p.consume(tokenTypeIdentifier, "Expect class name.")
+	p.consume(tokenTypeLeftBrace, "Expect '{' before class body.")
+	methods := make([]FunctionStmt, 0, 0)
+	for !p.check(tokenTypeRightBrace) && !p.isAtEnd() {
+		methods = append(methods, p.function("method"))
+	}
+	p.consume(tokenTypeRightBrace, "Expect '}' after class body.")
+	return ClassStmt{name: name, methods: methods}
+}
+
+func (p *Parser) function(kind string) FunctionStmt {
 	name := p.consume(tokenTypeIdentifier, "Expect "+kind+" name.")
 	p.consume(tokenTypeLeftParen, "Expect '(' after "+kind+" name.")
 	params := make([]Token, 0, 0)
@@ -260,8 +275,11 @@ func (p *Parser) assignment() Expr {
 
 		variableExpr, isVariableExpr := expr.(VariableExpr)
 		if isVariableExpr {
-			name := variableExpr.name
-			return AssignExpr{id: p.getNextExprId(), name: name, value: value}
+			return AssignExpr{id: p.getNextExprId(), name: variableExpr.name, value: value}
+		}
+		getExpr, isGetExpr := expr.(GetExpr)
+		if isGetExpr {
+			return SetExpr{id: p.getNextExprId(), object: getExpr.object, name: getExpr.name, value: value}
 		}
 		p.createError(equals, "Invalid assignment target.", false) // don't need to sync
 	}
@@ -343,6 +361,9 @@ func (p *Parser) call() Expr {
 	for {
 		if p.match(tokenTypeLeftParen) {
 			expr = p.finishCall(expr)
+		} else if p.match(tokenTypeDot) {
+			name := p.consume(tokenTypeIdentifier, "Expect property name after '.'.")
+			expr = GetExpr{id: p.getNextExprId(), object: expr, name: name}
 		} else {
 			break
 		}
@@ -375,6 +396,8 @@ func (p *Parser) primary() Expr {
 		return LiteralExpr{id: p.getNextExprId(), value: nil}
 	} else if p.match(tokenTypeNumber, tokenTypeString) {
 		return LiteralExpr{id: p.getNextExprId(), value: p.previous().literal}
+	} else if p.match(tokenTypeThis) {
+		return ThisExpr{id: p.getNextExprId(), keyword: p.previous()}
 	} else if p.match(tokenTypeIdentifier) {
 		return VariableExpr{id: p.getNextExprId(), name: p.previous()}
 	} else if p.match(tokenTypeLeftParen) {

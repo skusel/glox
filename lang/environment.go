@@ -44,6 +44,11 @@ func (env *environment) getAt(distance int, name Token) any {
 	}
 }
 
+func (env *environment) getThisValue() any {
+	// if this is called, we already checked that we are in a method
+	return env.values["this"]
+}
+
 func (env *environment) get(name Token) any {
 	value, found := env.values[name.lexeme]
 	if found {

@@ -7,4 +7,5 @@ package lang
 type callable interface {
 	arity() int
 	call(interpreter *Interpreter, args []any) any
+	toString() string
 }

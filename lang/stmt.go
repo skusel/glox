@@ -10,6 +10,7 @@ type Stmt interface {
 
 type stmtVisitor interface {
 	visitBlockStmt(stmt BlockStmt) any
+	visitClassStmt(stmt ClassStmt) any
 	visitExprStmt(stmt ExprStmt) any
 	visitFunctionStmt(stmt FunctionStmt) any
 	visitIfStmt(stmt IfStmt) any
@@ -25,6 +26,15 @@ type BlockStmt struct {
 
 func (stmt BlockStmt) accept(visitor stmtVisitor) any {
 	return visitor.visitBlockStmt(stmt)
+}
+
+type ClassStmt struct {
+	name    Token
+	methods []FunctionStmt
+}
+
+func (stmt ClassStmt) accept(visitor stmtVisitor) any {
+	return visitor.visitClassStmt(stmt)
 }
 
 type ExprStmt struct {
