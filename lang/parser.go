@@ -343,7 +343,7 @@ func (p *Parser) term() Expr {
 
 func (p *Parser) factor() Expr {
 	expr := p.unary()
-	for p.match(tokenTypeSlash, tokenTypeStar) {
+	for p.match(tokenTypeSlash, tokenTypeStar, tokenTypeMod) {
 		operator := p.previous()
 		right := p.unary()
 		expr = BinaryExpr{id: p.getNextExprId(), left: expr, operator: operator, right: right}

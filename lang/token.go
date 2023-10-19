@@ -21,6 +21,7 @@ const (
 	tokenTypeSemicolon
 	tokenTypeSlash
 	tokenTypeStar
+	tokenTypeMod
 	// comparison operator tokens
 	tokenTypeBang
 	tokenTypeBangEqual

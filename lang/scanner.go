@@ -153,6 +153,8 @@ func (s *Scanner) scanToken() {
 		s.addToken(tokenTypeSemicolon)
 	case '*':
 		s.addToken(tokenTypeStar)
+	case '%':
+		s.addToken(tokenTypeMod)
 	case '!':
 		if s.match('=') {
 			s.addToken(tokenTypeBangEqual)
