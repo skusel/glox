@@ -27,6 +27,7 @@ type ClassType int
 const (
 	ctNone ClassType = iota
 	ctClass
+	ctSubClass
 )
 
 type Resolver struct {
@@ -84,8 +85,8 @@ func (r *Resolver) declare(name Token) {
 	scope := r.scopes[len(r.scopes)-1]
 	_, hasVar := scope[name.lexeme]
 	if hasVar {
-		err := errors.New("Already a variable with this name in this scope.")
-		r.errorHandler.reportStaticError(name.line, name.lexeme, err, false)
+		r.errorHandler.reportStaticError(name.line, name.lexeme,
+			errors.New("Already a variable with this name is this scope."), false)
 	}
 	scope[name.lexeme] = false
 }
@@ -119,6 +120,17 @@ func (r *Resolver) visitClassStmt(stmt ClassStmt) any {
 	r.currentClassType = ctClass
 	r.declare(stmt.name)
 	r.define(stmt.name)
+	if stmt.superclass.getId() != 0 { // id will be unset if there is not superclass
+		if stmt.name.lexeme == stmt.superclass.name.lexeme {
+			r.errorHandler.reportStaticError(stmt.superclass.name.line,
+				stmt.superclass.name.lexeme,
+				errors.New("A class can't inherit from itself."), false)
+		}
+		r.currentClassType = ctSubClass
+		r.resolveExpression(stmt.superclass)
+		r.beginScope()
+		r.scopes[len(r.scopes)-1]["super"] = true
+	}
 	r.beginScope()
 	r.scopes[len(r.scopes)-1]["this"] = true
 	for _, method := range stmt.methods {
@@ -129,6 +141,9 @@ func (r *Resolver) visitClassStmt(stmt ClassStmt) any {
 		r.resolveFunction(method, declaration)
 	}
 	r.endScope()
+	if stmt.superclass.getId() != 0 {
+		r.endScope()
+	}
 	r.currentClassType = enclosingClassType
 	return nil
 }
@@ -163,13 +178,13 @@ func (r *Resolver) visitPrintStmt(stmt PrintStmt) any {
 
 func (r *Resolver) visitReturnStmt(stmt ReturnStmt) any {
 	if r.currentFunctionType == ftNone {
-		err := errors.New("Can't return from top-level code.")
-		r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme, err, false)
+		r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme,
+			errors.New("Can't return from top level code."), false)
 	}
 	if stmt.value != nil {
 		if r.currentFunctionType == ftInitializer {
-			err := errors.New("Can't return a value from an initializer.")
-			r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme, err, false)
+			r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme,
+				errors.New("Can't return a vlaue from an intializer."), false)
 		}
 		r.resolveExpression(stmt.value)
 	}
@@ -237,10 +252,23 @@ func (r *Resolver) visitSetExpr(expr SetExpr) any {
 	return nil
 }
 
+func (r *Resolver) visitSuperExpr(expr SuperExpr) any {
+	if r.currentClassType == ctNone {
+		r.errorHandler.reportStaticError(expr.keyword.line, expr.keyword.lexeme,
+			errors.New("Can't use 'super' outside of a class."), false)
+	}
+	if r.currentClassType != ctSubClass {
+		r.errorHandler.reportStaticError(expr.keyword.line, expr.keyword.lexeme,
+			errors.New("Can't user 'super' in a class with no superclass."), false)
+	}
+	r.resolveLocal(expr, expr.keyword)
+	return nil
+}
+
 func (r *Resolver) visitThisExpr(expr ThisExpr) any {
 	if r.currentClassType == ctNone {
-		err := errors.New("Can't use 'this' outside of a class.")
-		r.errorHandler.reportStaticError(expr.keyword.line, expr.keyword.lexeme, err, false)
+		r.errorHandler.reportStaticError(expr.keyword.line, expr.keyword.lexeme,
+			errors.New("Can't use 'this' outside of a class."), false)
 	}
 	r.resolveLocal(expr, expr.keyword)
 	return nil
@@ -255,8 +283,8 @@ func (r *Resolver) visitVariableExpr(expr VariableExpr) any {
 	if len(r.scopes) != 0 {
 		varDefined, hasVar := r.scopes[len(r.scopes)-1][expr.name.lexeme]
 		if hasVar && !varDefined {
-			err := errors.New("Can't read local variable in its own initializer.")
-			r.errorHandler.reportStaticError(expr.name.line, expr.name.lexeme, err, false)
+			r.errorHandler.reportStaticError(expr.name.line, expr.name.lexeme,
+				errors.New("Can't read local variable in its own initializer."), false)
 		}
 	}
 	r.resolveLocal(expr, expr.name)

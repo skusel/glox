@@ -48,6 +48,10 @@ func (printer AstPrinter) visitSetExpr(expr SetExpr) any {
 	panic("AstPrinter is not able to print set expressions at this time.")
 }
 
+func (printer AstPrinter) visitSuperExpr(expr SuperExpr) any {
+	panic(("AstPrinter is not able to print super expressions at this time."))
+}
+
 func (printer AstPrinter) visitThisExpr(expr ThisExpr) any {
 	panic("AstPrinter is not able to print this expressions at this time.")
 }

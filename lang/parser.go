@@ -33,7 +33,7 @@ import (
  * forStmt     -> "for" "(" ( varDecl | exprStmt | ";" )
  *                expression? ";"
  *                expression? ")" statement ;
- * classDecl   -> "class" IDENTIFIER "{" function* "}" ;
+ * classDecl   -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;
  * funDecl     -> "fun" function ;
  * function    -> IDENTIFIER "(" parameters? ")" block ;
  * parameters  -> IDENTIFIER ( "," IDENTIFIER )* ;
@@ -57,7 +57,7 @@ import (
  * primary     -> "true" | "false" | "nil"
  *              | NUMBER | STRING
  *			    | "(" expression ")"
- *              | IDENTIFIER ;
+ *              | IDENTIFIER | "super" . IDENTIFIER ;
  *****************************************************************************/
 
 type Parser struct {
@@ -116,13 +116,18 @@ func (p *Parser) declaration() (stmt Stmt) {
 
 func (p *Parser) classDeclaration() Stmt {
 	name := p.consume(tokenTypeIdentifier, "Expect class name.")
+	var superclass VariableExpr
+	if p.match(tokenTypeLess) {
+		p.consume(tokenTypeIdentifier, "Expect superclass name.")
+		superclass = VariableExpr{id: p.getNextExprId(), name: p.previous()}
+	}
 	p.consume(tokenTypeLeftBrace, "Expect '{' before class body.")
 	methods := make([]FunctionStmt, 0, 0)
 	for !p.check(tokenTypeRightBrace) && !p.isAtEnd() {
 		methods = append(methods, p.function("method"))
 	}
 	p.consume(tokenTypeRightBrace, "Expect '}' after class body.")
-	return ClassStmt{name: name, methods: methods}
+	return ClassStmt{name: name, superclass: superclass, methods: methods}
 }
 
 func (p *Parser) function(kind string) FunctionStmt {
@@ -396,6 +401,11 @@ func (p *Parser) primary() Expr {
 		return LiteralExpr{id: p.getNextExprId(), value: nil}
 	} else if p.match(tokenTypeNumber, tokenTypeString) {
 		return LiteralExpr{id: p.getNextExprId(), value: p.previous().literal}
+	} else if p.match(tokenTypeSuper) {
+		keyword := p.previous()
+		p.consume(tokenTypeDot, "Expect '.' after 'super'.")
+		method := p.consume(tokenTypeIdentifier, "Expect superclass method name.")
+		return SuperExpr{id: p.getNextExprId(), keyword: keyword, method: method}
 	} else if p.match(tokenTypeThis) {
 		return ThisExpr{id: p.getNextExprId(), keyword: p.previous()}
 	} else if p.match(tokenTypeIdentifier) {

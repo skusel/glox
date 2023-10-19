@@ -100,13 +100,30 @@ func (interpreter *Interpreter) visitBlockStmt(stmt BlockStmt) any {
 }
 
 func (interpreter *Interpreter) visitClassStmt(stmt ClassStmt) any {
+	var superclass *class
+	if stmt.superclass.getId() != 0 {
+		class, isClass := interpreter.evaluate(stmt.superclass).(class)
+		if !isClass {
+			err := errors.New("Superclass must be a class.")
+			interpreter.errorHandler.reportRuntimeError(stmt.superclass.name.line, err)
+		}
+		superclass = &class
+	}
 	interpreter.env.define(stmt.name.lexeme, nil)
+	if stmt.superclass.getId() != 0 {
+		interpreter.env = newChildEnvironment(interpreter.env)
+		interpreter.env.define("super", superclass)
+	}
 	methods := make(map[string]function)
 	for _, method := range stmt.methods {
 		methods[method.name.lexeme] = function{declaration: method, closure: interpreter.env,
 			isInitializer: method.name.lexeme == "init"}
 	}
-	class := class{name: stmt.name.lexeme, methods: methods, errorHandler: interpreter.errorHandler}
+	class := class{name: stmt.name.lexeme, superclass: superclass, methods: methods,
+		errorHandler: interpreter.errorHandler}
+	if stmt.superclass.getId() != 0 {
+		interpreter.env = interpreter.env.enclosing
+	}
 	interpreter.env.assign(stmt.name, class)
 	return nil
 }
@@ -316,6 +333,19 @@ func (interpreter *Interpreter) visitSetExpr(expr SetExpr) any {
 	value := interpreter.evaluate(expr.value)
 	object.set(expr.name, value)
 	return value
+}
+
+func (interpreter *Interpreter) visitSuperExpr(expr SuperExpr) any {
+	distance := interpreter.locals[expr.getId()]
+	superclass := interpreter.env.getAt(distance, expr.keyword).(*class)
+	object := interpreter.env.getSubClassThisValue(distance).(instance)
+	method, foundMethod := superclass.findMethod(expr.method.lexeme).(function)
+	if !foundMethod {
+		err := errors.New("Undefined property '" + expr.method.lexeme + "'.")
+		interpreter.errorHandler.reportRuntimeError(expr.method.line, err)
+		return nil
+	}
+	return method.bind(object)
 }
 
 func (interpreter *Interpreter) visitThisExpr(expr ThisExpr) any {

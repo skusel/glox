@@ -49,6 +49,11 @@ func (env *environment) getThisValue() any {
 	return env.values["this"]
 }
 
+func (env *environment) getSubClassThisValue(distance int) any {
+	// if this is called, we already checked that we are in a super class
+	return env.ancestor(distance - 1).values["this"]
+}
+
 func (env *environment) get(name Token) any {
 	value, found := env.values[name.lexeme]
 	if found {
