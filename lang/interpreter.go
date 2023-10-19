@@ -3,6 +3,7 @@ package lang
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 )
@@ -256,6 +257,14 @@ func (interpreter *Interpreter) visitBinaryExpr(expr BinaryExpr) any {
 			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
 		}
 		return leftFloat * rightFloat
+	case tokenTypeMod:
+		valid, leftFloat, rightFloat := areValuesValidFloats(left, right)
+		if !valid {
+			err := errors.New("Operands must be numbers when using the '%' operator.")
+			interpreter.errorHandler.reportRuntimeError(expr.operator.line, err)
+		}
+		// using math.Mod instead of '%' to handle floating point numbers correctly
+		return math.Mod(leftFloat, rightFloat)
 	case tokenTypeEqualEqual:
 		return reflect.DeepEqual(left, right)
 	case tokenTypeBangEqual:

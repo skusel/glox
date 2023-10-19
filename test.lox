@@ -52,12 +52,6 @@ class BostonCream < Doughnut {
     }
 }
 
-class Eclair {
-    cook() {
-        super.cook();
-        print "Pip full of creme patissiere.";
-    }
-}
-
 BostonCream().cook();
-//Eclair().cook();
+
+print 1 + 84 % 5;
