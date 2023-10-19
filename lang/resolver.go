@@ -18,18 +18,28 @@ type FunctionType int
 const (
 	ftNone FunctionType = iota
 	ftFunction
+	ftInitializer
+	ftMethod
+)
+
+type ClassType int
+
+const (
+	ctNone ClassType = iota
+	ctClass
 )
 
 type Resolver struct {
 	interpreter         *Interpreter
 	scopes              []map[string]bool
 	currentFunctionType FunctionType
+	currentClassType    ClassType
 	errorHandler        *ErrorHandler
 }
 
 func NewResolver(interpreter *Interpreter) *Resolver {
 	return &Resolver{interpreter: interpreter, scopes: make([]map[string]bool, 0, 0),
-		currentFunctionType: ftNone, errorHandler: interpreter.errorHandler}
+		currentFunctionType: ftNone, currentClassType: ctNone, errorHandler: interpreter.errorHandler}
 }
 
 func (r *Resolver) ResolveStatements(statements []Stmt) {
@@ -71,7 +81,7 @@ func (r *Resolver) declare(name Token) {
 	if len(r.scopes) == 0 {
 		return
 	}
-	scope := r.scopes[0]
+	scope := r.scopes[len(r.scopes)-1]
 	_, hasVar := scope[name.lexeme]
 	if hasVar {
 		err := errors.New("Already a variable with this name in this scope.")
@@ -84,7 +94,7 @@ func (r *Resolver) define(name Token) {
 	if len(r.scopes) == 0 {
 		return
 	}
-	r.scopes[0][name.lexeme] = true
+	r.scopes[len(r.scopes)-1][name.lexeme] = true
 }
 
 func (r *Resolver) resolveLocal(expr Expr, name Token) {
@@ -101,6 +111,25 @@ func (r *Resolver) visitBlockStmt(stmt BlockStmt) any {
 	r.beginScope()
 	r.ResolveStatements(stmt.statements)
 	r.endScope()
+	return nil
+}
+
+func (r *Resolver) visitClassStmt(stmt ClassStmt) any {
+	enclosingClassType := r.currentClassType
+	r.currentClassType = ctClass
+	r.declare(stmt.name)
+	r.define(stmt.name)
+	r.beginScope()
+	r.scopes[len(r.scopes)-1]["this"] = true
+	for _, method := range stmt.methods {
+		declaration := ftMethod
+		if method.name.lexeme == "init" {
+			declaration = ftInitializer
+		}
+		r.resolveFunction(method, declaration)
+	}
+	r.endScope()
+	r.currentClassType = enclosingClassType
 	return nil
 }
 
@@ -138,6 +167,10 @@ func (r *Resolver) visitReturnStmt(stmt ReturnStmt) any {
 		r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme, err, false)
 	}
 	if stmt.value != nil {
+		if r.currentFunctionType == ftInitializer {
+			err := errors.New("Can't return a value from an initializer.")
+			r.errorHandler.reportStaticError(stmt.keyword.line, stmt.keyword.lexeme, err, false)
+		}
 		r.resolveExpression(stmt.value)
 	}
 	return nil
@@ -178,6 +211,11 @@ func (r *Resolver) visitCallExpr(expr CallExpr) any {
 	return nil
 }
 
+func (r *Resolver) visitGetExpr(expr GetExpr) any {
+	r.resolveExpression(expr.object)
+	return nil
+}
+
 func (r *Resolver) visitGroupingExpr(expr GroupingExpr) any {
 	r.resolveExpression(expr.expression)
 	return nil
@@ -193,6 +231,21 @@ func (r *Resolver) visitLogicalExpr(expr LogicalExpr) any {
 	return nil
 }
 
+func (r *Resolver) visitSetExpr(expr SetExpr) any {
+	r.resolveExpression(expr.value)
+	r.resolveExpression(expr.object)
+	return nil
+}
+
+func (r *Resolver) visitThisExpr(expr ThisExpr) any {
+	if r.currentClassType == ctNone {
+		err := errors.New("Can't use 'this' outside of a class.")
+		r.errorHandler.reportStaticError(expr.keyword.line, expr.keyword.lexeme, err, false)
+	}
+	r.resolveLocal(expr, expr.keyword)
+	return nil
+}
+
 func (r *Resolver) visitUnaryExpr(expr UnaryExpr) any {
 	r.resolveExpression(expr.right)
 	return nil
@@ -200,7 +253,7 @@ func (r *Resolver) visitUnaryExpr(expr UnaryExpr) any {
 
 func (r *Resolver) visitVariableExpr(expr VariableExpr) any {
 	if len(r.scopes) != 0 {
-		varDefined, hasVar := r.scopes[0][expr.name.lexeme]
+		varDefined, hasVar := r.scopes[len(r.scopes)-1][expr.name.lexeme]
 		if hasVar && !varDefined {
 			err := errors.New("Can't read local variable in its own initializer.")
 			r.errorHandler.reportStaticError(expr.name.line, expr.name.lexeme, err, false)

@@ -10,8 +10,9 @@ type returnContent struct {
 }
 
 type function struct {
-	declaration FunctionStmt
-	closure     *environment
+	declaration   FunctionStmt
+	closure       *environment
+	isInitializer bool
 }
 
 func (fun function) arity() int {
@@ -28,8 +29,13 @@ func (fun function) call(interpreter *Interpreter, args []any) (value any) {
 		if err != nil {
 			returnContent, isReturnContent := err.(returnContent)
 			if isReturnContent {
-				// update the return value to be the called functions return value
-				value = returnContent.value
+				if fun.isInitializer {
+					// blank return statements in initializers should return "this"
+					value = fun.closure.getThisValue()
+				} else {
+					// update the return value to be the called functions return value
+					value = returnContent.value
+				}
 			} else {
 				// this is not a panic thrown by us, pass it on
 				panic(err)
@@ -42,7 +48,16 @@ func (fun function) call(interpreter *Interpreter, args []any) (value any) {
 		funEnv.define(param.lexeme, args[i])
 	}
 	interpreter.executeBlock(fun.declaration.body, funEnv)
+	if fun.isInitializer {
+		return fun.closure.getThisValue()
+	}
 	return nil
+}
+
+func (fun function) bind(inst instance) function {
+	env := newChildEnvironment(fun.closure)
+	env.define("this", inst)
+	return function{declaration: fun.declaration, closure: env, isInitializer: fun.isInitializer}
 }
 
 func (fun function) toString() string {

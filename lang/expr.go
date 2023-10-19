@@ -17,9 +17,12 @@ type exprVisitor interface {
 	visitAssignExpr(a AssignExpr) any
 	visitBinaryExpr(b BinaryExpr) any
 	visitCallExpr(c CallExpr) any
+	visitGetExpr(g GetExpr) any
 	visitGroupingExpr(g GroupingExpr) any
 	visitLiteralExpr(l LiteralExpr) any
 	visitLogicalExpr(l LogicalExpr) any
+	visitSetExpr(s SetExpr) any
+	visitThisExpr(t ThisExpr) any
 	visitUnaryExpr(u UnaryExpr) any
 	visitVariableExpr(v VariableExpr) any
 }
@@ -68,6 +71,20 @@ func (c CallExpr) accept(visitor exprVisitor) any {
 	return visitor.visitCallExpr(c)
 }
 
+type GetExpr struct {
+	id     int
+	object Expr
+	name   Token
+}
+
+func (g GetExpr) getId() int {
+	return g.id
+}
+
+func (g GetExpr) accept(visitor exprVisitor) any {
+	return visitor.visitGetExpr(g)
+}
+
 type GroupingExpr struct {
 	id         int
 	expression Expr
@@ -107,6 +124,34 @@ func (l LogicalExpr) getId() int {
 
 func (l LogicalExpr) accept(visitor exprVisitor) any {
 	return visitor.visitLogicalExpr(l)
+}
+
+type SetExpr struct {
+	id     int
+	object Expr
+	name   Token
+	value  Expr
+}
+
+func (s SetExpr) getId() int {
+	return s.id
+}
+
+func (s SetExpr) accept(visitor exprVisitor) any {
+	return visitor.visitSetExpr(s)
+}
+
+type ThisExpr struct {
+	id      int
+	keyword Token
+}
+
+func (t ThisExpr) getId() int {
+	return t.id
+}
+
+func (t ThisExpr) accept(visitor exprVisitor) any {
+	return visitor.visitThisExpr(t)
 }
 
 type UnaryExpr struct {

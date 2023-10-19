@@ -1,18 +1,40 @@
-//fun fib(n) {
-//    if(n <= 1) return n;
-//    return fib(n - 2) + fib(n - 1);
-//}
-//
-//for(var i = 0; i < 20; i = i + 1) {
-//    print fib(i);
+fun fib(n) {
+    if(n <= 1) return n;
+    return fib(n - 2) + fib(n - 1);
+}
+
+for(var i = 0; i < 20; i = i + 1) {
+    print fib(i);
+}
+
+//var a = "global";
+//{
+//    fun showA() {
+//        print a;
+//    }
+//    showA();
+//    var a = "block";
+//    showA();
 //}
 
-var a = "global";
-{
-    fun showA() {
-        print a;
+class Bacon {
+    eat() {
+        print "Crunch crunch crunch!";
     }
-    showA();
-    var a = "block";
-    showA();
 }
+Bacon().eat();
+
+class Cake {
+    init(flavor) {
+        this.flavor = flavor;
+        return;
+    }
+
+    taste() {
+        var adjective = "delicious";
+        print "The " + this.flavor + " cake is " + adjective + "!";
+    }
+}
+var cake = Cake("ice cream");
+//cake.flavor = "German chocolate";
+cake.taste();
