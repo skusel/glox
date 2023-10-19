@@ -7,6 +7,7 @@ package lang
 
 type class struct {
 	name         string
+	superclass   *class
 	methods      map[string]function
 	errorHandler *ErrorHandler
 }
@@ -32,6 +33,8 @@ func (c class) findMethod(name string) any {
 	method, foundMethod := c.methods[name]
 	if foundMethod {
 		return method
+	} else if c.superclass != nil {
+		return c.superclass.findMethod(name)
 	} else {
 		return nil
 	}

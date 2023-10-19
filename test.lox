@@ -38,3 +38,26 @@ class Cake {
 var cake = Cake("ice cream");
 //cake.flavor = "German chocolate";
 cake.taste();
+
+class Doughnut {
+    cook() {
+        print "Fry until golden brown.";
+    }
+}
+
+class BostonCream < Doughnut {
+    cook() {
+        super.cook();
+        print "Pipe full of custard and coat with chocolate.";
+    }
+}
+
+class Eclair {
+    cook() {
+        super.cook();
+        print "Pip full of creme patissiere.";
+    }
+}
+
+BostonCream().cook();
+//Eclair().cook();

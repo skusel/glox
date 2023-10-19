@@ -22,6 +22,7 @@ type exprVisitor interface {
 	visitLiteralExpr(l LiteralExpr) any
 	visitLogicalExpr(l LogicalExpr) any
 	visitSetExpr(s SetExpr) any
+	visitSuperExpr(s SuperExpr) any
 	visitThisExpr(t ThisExpr) any
 	visitUnaryExpr(u UnaryExpr) any
 	visitVariableExpr(v VariableExpr) any
@@ -139,6 +140,20 @@ func (s SetExpr) getId() int {
 
 func (s SetExpr) accept(visitor exprVisitor) any {
 	return visitor.visitSetExpr(s)
+}
+
+type SuperExpr struct {
+	id      int
+	keyword Token
+	method  Token
+}
+
+func (s SuperExpr) getId() int {
+	return s.id
+}
+
+func (s SuperExpr) accept(visitor exprVisitor) any {
+	return visitor.visitSuperExpr(s)
 }
 
 type ThisExpr struct {
