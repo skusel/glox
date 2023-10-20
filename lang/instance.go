@@ -2,6 +2,11 @@ package lang
 
 import "errors"
 
+/******************************************************************************
+ * The instance struct is used to represent an instance of a Lox class. The
+ * state of objects is stored here.
+ *****************************************************************************/
+
 type instance struct {
 	class        class
 	fields       map[string]any

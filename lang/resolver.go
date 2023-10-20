@@ -6,11 +6,11 @@ import (
 
 /******************************************************************************
  * The in this glox implementation the resolver performs a separate pass on
- * the AST before it is passed to the interpreter. It performs semantic
- * analysis. That includes, calculating how many hops away the declared
- * variable is in the environment chain (i.e. resolving variables), checking
- * for multiple variable decalrations, and making sure return statements are
- * in a function body.
+ * the AST before it is given to the interpreter. Generally speaking, it
+ * performs semantic analysis. That includes, calculating how many hops away
+ * the declared variable is in the environment chain (i.e. resolving
+ * variables), checking for multiple variable decalrations, making sure return
+ * statements are in a function body, and a few other miscellaneous checks.
  *****************************************************************************/
 
 type FunctionType int
