@@ -1,7 +1,7 @@
 # glox
 This is a Go implementation of a tree-walk interpreter for the Lox scripting language. 
 
-Lox language specifications and a Java implementation of a tree-walk interpreter for it can be found in the book [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
+Lox language specifications and a Java implementation of a tree-walk interpreter for Lox (named jlox) can be found in the book [Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
 
 ## Downloading and Installing
 To start, you'll need to have Go installed locally.
