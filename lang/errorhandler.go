@@ -7,6 +7,10 @@ import (
 
 /******************************************************************************
  * Helper struct to assist with error reporting.
+ *
+ * Panics are used in a few spots in the interpreter implementation to unwind
+ * the call stack. This unwinding is often the easiest solution given the
+ * recursive nature of the parser, reolver, and interpreter implementations.
  *****************************************************************************/
 
 type ErrorHandler struct {

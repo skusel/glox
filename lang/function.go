@@ -2,7 +2,7 @@ package lang
 
 /******************************************************************************
  * function implements the callable interface. It is used to represent
- * function calls in the interpreter's runtime.
+ * function, method, and constructor calls in the interpreter's runtime.
  *****************************************************************************/
 
 type returnContent struct {
