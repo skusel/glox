@@ -8,10 +8,10 @@ To start, you'll need to have Go installed locally.
 
 Using Go run:
 ```
-go get https://github.com/skusel/glox
+go install github.com/skusel/glox@latest
 ```
 
-This will download and install the executable to your `$GOPATH/bin`. You can add this directory to your path, if it's not already on it, so you can run `glox` without having to type in the entire path to the executable.
+This will download and install the executable to your `$GOBIN`. You can add this directory to your path, if it's not already on it, so you can run `glox` without having to type in the entire path to the executable.
 
 ## A Little About Lox
 In short, the Lox language is a dynamcially typed, object oriented scripting language with C-like syntax.
