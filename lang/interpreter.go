@@ -60,7 +60,7 @@ func (interpreter *Interpreter) resolve(expr Expr, depth int) {
 
 func (interpreter *Interpreter) lookUpVariable(name Token, expr Expr) any {
 	distance, hasDistance := interpreter.locals[expr.getId()]
-	// resolved only local variables so if there is not distance, check the global map
+	// resolved only local variables so if there is no distance, check the global map
 	if hasDistance {
 		return interpreter.env.getAt(distance, name)
 	} else {
